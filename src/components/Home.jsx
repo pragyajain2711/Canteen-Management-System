@@ -1,10 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-function Home() {
+function Home({ addToCart }) {
   const headlineStyle = {
     fontSize: "2.5rem",
-    fontWeight: "Bold",
+    fontWeight: "bold",
     textAlign: "center",
   };
   const subTextStyle = {
@@ -16,6 +16,7 @@ function Home() {
     display: "flex",
     justifyContent: "center",
     gap: "20px",
+    marginBottom: "30px"
   };
 
   const browseButton = {
@@ -40,22 +41,22 @@ function Home() {
   const Dishes = [
     {
       name: "Paneer Butter Masala",
-      price: "₹90",
+      price: 90,
       image: "https://images.unsplash.com/photo-1574484284002-952d92456975?w=1000&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8ZGlzaHxlbnwwfHwwfHx8MA%3D%3D",
     },
     {
       name: "Bhel",
-      price: "₹30",
+      price: 30,
       image: "https://images.unsplash.com/photo-1643892548578-d0a056dd2ee5?w=1000&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YmhlbHxlbnwwfHwwfHx8MA%3D%3D",
     },
     {
       name: "Chai",
-      price: "₹10",
+      price: 10,
       image: "https://images.unsplash.com/photo-1630748662359-40a2105640c7?q=80&w=736&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
     {
       name: "Samosa",
-      price: "₹15",
+      price: 15,
       image: "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=1000&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8c2Ftb3NhfGVufDB8fDB8fHww",
     },
   ];
@@ -82,7 +83,8 @@ function Home() {
     objectFit: "cover",
     borderRadius: "5px",
   };
-   const addButtonStyle = {
+
+  const addButtonStyle = {
     marginTop: "10px",
     padding: "8px 16px",
     backgroundColor: "#007bff",
@@ -90,7 +92,7 @@ function Home() {
     border: "none",
     borderRadius: "5px",
     cursor: "pointer",
-    fontWeight: "bold"
+    fontWeight: "bold",
   };
 
   return (
@@ -109,14 +111,17 @@ function Home() {
           Sign Up Today
         </Link>
       </div>
+
       <h2 style={{ textAlign: "center", fontWeight: "bold" }}>Top Dishes</h2>
       <div style={gridStyle}>
         {Dishes.map((dish, index) => (
           <div key={index} style={cardStyle}>
-            <img src={dish.image} style={imageStyle} />
+            <img src={dish.image} alt={dish.name} style={imageStyle} />
             <h3>{dish.name}</h3>
-            <p style={{ fontWeight: "bold" }}>{dish.price}</p>
-            <button style={addButtonStyle}>+Add to Cart</button>
+            <p style={{ fontWeight: "bold" }}>₹{dish.price}</p>
+            <button style={addButtonStyle} onClick={() => addToCart(dish)}>
+              + Add to Cart
+            </button>
           </div>
         ))}
       </div>
