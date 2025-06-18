@@ -5,8 +5,8 @@ import Footer from "./components/Footer";
 import Home from "./components/Home";
 import Menu from "./components/Menu";
 import Cart from "./components/Cart";
-import Sign_Up from "./components/SignUp";
-import Sign_In from "./components/SignIn";
+import SignUp from "./components/SignUp";
+import SignIn from "./components/SignIn";
 import "./App.css";
 
 function App() {
@@ -25,6 +25,9 @@ function App() {
         return [...prev, { ...dish, quantity: 1 }];
       }
     });
+
+    // Opti Show notification
+    alert(`${dish.name} added to cart`);
   };
 
   const onIncrement = (dish) => {
@@ -56,8 +59,9 @@ function App() {
   return (
     <Router>
       <div className="app-container">
-        <Navbar />
-        <div className="main-content">
+        <Navbar cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)} />
+        
+        <main className="main-content">
           <Routes>
             <Route path="/" element={<Home addToCart={addToCart} />} />
             <Route path="/menu" element={<Menu addToCart={addToCart} />} />
@@ -72,10 +76,11 @@ function App() {
                 />
               }
             />
-            <Route path="/sign_in" element={<Sign_In />} />
-            <Route path="/sign_up" element={<Sign_Up />} />
+            <Route path="/sign_in" element={<SignIn />} />
+            <Route path="/sign_up" element={<SignUp />} />
           </Routes>
-        </div>
+        </main>
+
         <Footer />
       </div>
     </Router>
