@@ -1,7 +1,10 @@
-import React from 'react';
+import React ,{useContext} from 'react';
 import { Link } from 'react-router-dom';
+import { AuthContext } from './AuthContext';
+
 
 function Navbar() {
+  const { isAuthenticated, employee, logout } = useContext(AuthContext);
   const navStyle = {
     display: 'flex',
     justifyContent: 'space-between',
@@ -52,12 +55,32 @@ function Navbar() {
       <div style={centerLinksStyle}>
         <Link to="/" style={linkStyle}>Home</Link>
         <Link to="/menu" style={linkStyle}>Menu</Link>
-        <Link to="/cart" style={linkStyle}>Cart</Link>
+        {isAuthenticated && <Link to="/cart" style={linkStyle}>Cart</Link>}
       </div>
-
-      <div style={rightButtonsStyle}>
+       <div style={rightButtonsStyle}>
+       {isAuthenticated ? (
+          <>
+            <span style={{ marginRight: '10px' }}>Hi, {employee?.fullName}</span>
+            <button 
+              onClick={logout}
+              style={{ 
+                ...linkStyle,
+                padding: '5px 12px',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                borderRadius: '5px',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Logout
+            </button>
+          </>
+        ) : (
+          <>
         <Link to="/sign_in" style={signInStyle}>Sign In</Link>
         <Link to="/sign_up" style={signUpStyle}>Sign Up</Link>
+        </>)}
       </div>
     </nav>
   );

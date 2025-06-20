@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-
+import React, { useState ,useContext} from 'react';
+import { AuthProvider, AuthContext } from './AuthContext';
+import { useNavigate } from 'react-router-dom';
+import api from './api';
+ 
 function SignIn() {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+ const navigate = useNavigate();
+ const { login } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,14 +19,26 @@ function SignIn() {
       return;
     }
 
-    try {
-      const res = await axios.post('/api/signin', { employeeId, password });
-      console.log('Signed in!', res.data);
-      // You can save token or redirect user from here
+     try {
+      const response = await api.post('/api/auth/signin', { 
+        employeeId, 
+        password 
+      });
+      
+     
+       const employeeData = {
+        fullName: response.data.fullName,
+        employeeId: response.data.employeeId,
+        department: response.data.department
+      };
+             login(response.data.token, employeeData);
+
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Sign in failed');
     }
   };
+   
 
   const styles = {
   container: {

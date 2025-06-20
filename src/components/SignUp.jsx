@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import api from './api';
 
 function Sign_Up() {
   const [formData, setFormData] = useState({
@@ -9,16 +10,13 @@ function Sign_Up() {
     password: "",
     confirmPassword: ""
   });
-  
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const navigate = useNavigate();
+
   const departments = [
-    "Finance",
-    "LPG",
-    "IS",
-    "HR",
-    "Sales",
-    "Reception",
-    "Engineer",
-    "Law"
+    "Finance", "LPG", "IS", "HR", "Sales", "Reception", "Engineer", "Law"
   ];
 
   const handleChange = (e) => {
@@ -27,16 +25,39 @@ function Sign_Up() {
       ...prev,
       [name]: value
     }));
+    setError("");  
+    setSuccess(""); 
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
+      setError("Passwords do not match.");
       return;
     }
-    console.log("Account Created:", formData);
-    alert("Account created successfully!");
+
+    try {
+      const response = await api.post('api/auth/signup', formData);
+      setSuccess("Account created successfully!");
+
+      setTimeout(() => {
+        navigate("/sign_in", {
+          state: {
+            employeeId: formData.employeeId,
+            password: formData.password
+          }
+        });
+      }, 1500);
+
+    } catch (err) {
+      const message = err.response?.data || "Registration failed. Try again.";
+      if (message === "Employee ID is already in use") {
+        setError("An account with this Employee ID already exists.");
+      } else {
+        setError(message);
+      }
+    }
   };
 
   const containerStyle = {
@@ -101,7 +122,6 @@ function Sign_Up() {
 
   return (
     <form style={containerStyle} onSubmit={handleSubmit}>
-    
       <div style={titleStyle}>Create Account</div>
       <div style={subTitleStyle}>Join our canteen community today</div>
 
@@ -162,6 +182,9 @@ function Sign_Up() {
         required
         style={inputStyle}
       />
+
+      {error && <div style={{ color: 'red', marginBottom: '15px' }}>{error}</div>}
+      {success && <div style={{ color: 'green', marginBottom: '15px' }}>{success}</div>}
 
       <button type="submit" style={buttonStyle}>Create Account</button>
 
