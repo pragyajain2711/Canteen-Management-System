@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+/*import React, { useState, useContext } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -9,6 +9,8 @@ import SignUp from "./components/SignUp";
 import SignIn from "./components/SignIn";
 import { AuthProvider, AuthContext } from './components/AuthContext';
 import Dashboard from './components/Dashboard';
+import {ThemeProvider} from "../ThemeContext";
+
 import "./App.css";
 
 function AppContent() {
@@ -57,6 +59,8 @@ function AppContent() {
   };
 
   return (
+    <ThemeProvider>
+     <Router>
     <div className="app-container">
       <Navbar cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)} />
       
@@ -90,6 +94,8 @@ function AppContent() {
 
       <Footer />
     </div>
+    </Router>
+    </ThemeProvider>
   );
 }
 
@@ -104,6 +110,57 @@ function App() {
       <Router>
         <AppContent />
       </Router>
+    </AuthProvider>
+  );
+}
+
+export default App;
+*/
+import React,{useState ,useContext} from "react";
+import { BrowserRouter as Router, Routes, Route,Navigate } from "react-router-dom";
+import { ThemeProvider } from "./ThemeContext";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import Home from "./components/Home";
+import Menu from "./components/Menu";
+import Cart from "./components/Cart";
+import SignUp from "./components/SignUp";
+import SignIn from "./components/SignIn";
+import { AuthProvider, AuthContext } from './components/AuthContext';
+import Dashboard from './components/Dashboard';
+import TodayMenu from "./components/TodayMenu";
+import "./App.css";
+
+function App() {
+  function ProtectedRoute({ children }) {
+  const { isAuthenticated } = useContext(AuthContext);
+  return isAuthenticated ? children : <Navigate to="/sign_in" replace />;
+}
+  return (
+    <AuthProvider>
+      <Router>
+    <ThemeProvider>
+     
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/sign_up" element={<SignUp />} />
+          <Route path="/sign_in" element={<SignIn />} />
+          <Route path="/menu" element={<Menu />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+        </Routes>
+        <Footer />
+      
+    </ThemeProvider>
+    </Router>
     </AuthProvider>
   );
 }

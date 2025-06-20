@@ -1,18 +1,22 @@
-import React ,{useContext} from 'react';
+import React ,{useContext,useState,useEffect} from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from './AuthContext';
-
+import {useTheme} from "../ThemeContext";
+import { Moon, Sun } from "lucide-react";
 
 function Navbar() {
   const { isAuthenticated, employee, logout } = useContext(AuthContext);
+  const {theme,toggleTheme}=useTheme();
   const navStyle = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '10px 20px',
-    backgroundColor: '#ffffff', // white background
+    //backgroundColor: '#ffffff', // white background
     color: '#000', // black text
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', // optional subtle shadow
+    backgroundColor: theme === "light" ? "#ffffff" : "#1e1e1e",
+    color: theme === "light" ? "#000" : "#fff",
   };
 
   const centerLinksStyle = {
@@ -26,6 +30,8 @@ function Navbar() {
     color: '#000', // black text
     textDecoration: 'none',
     fontWeight: '500',
+    backgroundColor: theme === "light" ? "#ffffff" : "#1e1e1e",
+    color: theme === "light" ? "#000" : "#fff",
   };
 
   const rightButtonsStyle = {
@@ -47,6 +53,22 @@ function Navbar() {
     color: 'white',
     borderRadius: '5px',
   };
+  const toggleButtonStyle = {
+    borderRadius: "50%",
+    width: "36px",
+    height: "36px",
+    border: "none",
+    backgroundColor: theme === "light" ? "#e2e8f0" : "#2d3748",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    transition: "0.3s",
+    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.2)",
+  };
+   const iconStyle = {
+    color: theme === "light" ? "#000" : "#fff",
+  };
 
   return (
     <nav className="navbar" style={navStyle}>
@@ -58,6 +80,9 @@ function Navbar() {
         {isAuthenticated && <Link to="/cart" style={linkStyle}>Cart</Link>}
       </div>
        <div style={rightButtonsStyle}>
+        <button onClick={toggleTheme} style={toggleButtonStyle} title="Toggle Theme">
+          {theme === "light" ? <Moon size={18} style={iconStyle} /> : <Sun size={18} style={iconStyle} />}
+        </button>
        {isAuthenticated ? (
           <>
             <span style={{ marginRight: '10px' }}>Hi, {employee?.fullName}</span>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from './api';
+import {useTheme} from "../ThemeContext";
 
 function Sign_Up() {
   const [formData, setFormData] = useState({
@@ -14,7 +15,7 @@ function Sign_Up() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
-
+const {theme} =useTheme();
   const departments = [
     "Finance", "LPG", "IS", "HR", "Sales", "Reception", "Engineer", "Law"
   ];
@@ -65,6 +66,8 @@ function Sign_Up() {
     margin: "50px auto",
     padding: "30px",
     backgroundColor: "#ffffff",
+    backgroundColor: theme === "light" ? "#f8f9fa" : "#1a1a1a",
+    color: theme === "light" ? "#000" : "#fff",
     borderRadius: "8px",
     boxShadow: "0 0 15px rgba(0,0,0,0.1)",
     fontFamily: "Arial, sans-serif"

@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTheme} from "../ThemeContext";
 
 function Footer() {
   return (

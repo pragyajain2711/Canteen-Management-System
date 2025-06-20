@@ -1,16 +1,25 @@
 import React from "react";
+import {useTheme} from "../ThemeContext";
 
 function Cart({ cartItems = [], onIncrement, onDecrement, onClearCart }) {
   const getTotal = () => {
     return cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   };
-
+const {theme} = useTheme();
   const styles = {
+    //container: {
+     // maxWidth: "1200px",
+     // margin: "0 auto",
+     // padding: "20px",
+    //},
     container: {
       maxWidth: "1200px",
       margin: "0 auto",
-      padding: "20px",
-    },
+      padding: "30px 20px",
+      backgroundColor: "#f8f9fa",
+      fontFamily: "'Segoe UI', sans-serif",
+      backgroundColor: theme === "light" ? "#f8f9fa" : "#1a1a1a",
+      color: theme === "light" ? "#000" : "#fff"},
     heading: {
       fontSize: "2rem",
       fontWeight: "bold",

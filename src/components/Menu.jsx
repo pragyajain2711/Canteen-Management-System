@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import {useTheme} from "../ThemeContext";
 
 const defaultMenuData = {
+  
   Monday: {
     breakfast: [
       { name: "Samosa", price: 10 },
@@ -130,7 +132,7 @@ const defaultMenuData = {
   
   
 };
-
+/*
 const styles = {
   container: {
     padding: "20px",
@@ -195,8 +197,76 @@ const styles = {
     maxWidth: "70px",
   },
 };
+*/
 
 function Menu({ menuData = defaultMenuData, onAddToCart = () => {} }) {
+  const {theme} = useTheme();
+  const styles = {
+  container: {
+    padding: "20px",
+    backgroundColor: "#f0f9f8",
+    fontFamily: "Segoe UI, Tahoma, Geneva, Verdana, sans-serif",
+     backgroundColor: theme === "light" ? "#f8f9fa" : "#1a1a1a",
+    color: theme === "light" ? "#000" : "#fff",
+  },
+  dayCard: {
+    marginBottom: "24px",
+    backgroundColor: "#ffffff",
+    padding: "16px",
+    borderRadius: "10px",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+  },
+  dayTitle: {
+    fontSize: "22px",
+    fontWeight: "bold",
+    marginBottom: "10px",
+    color: "#0f766e",
+    cursor: "pointer",
+    display: "flex",
+    justifyContent: "space-between",
+  },
+  mealType: {
+    fontSize: "16px",
+    fontWeight: "600",
+    margin: "12px 0 6px",
+    color: "#0891b2",
+    cursor: "pointer",
+    display: "flex",
+    justifyContent: "space-between",
+  },
+  itemBox: {
+    display: "flex",
+    alignItems: "center",
+    padding: "6px 0",
+    borderBottom: "1px solid #e0e0e0",
+  },
+  itemName: {
+    flex: 2,
+    fontSize: "15px",
+    color: "#333",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  price: {
+    flex: 1,
+    textAlign: "center",
+    fontWeight: "600",
+    color: "#16a34a",
+  },
+  button: {
+    flex: 1,
+    textAlign: "right",
+    padding: "4px 8px",
+    backgroundColor: "#0d9488",
+    color: "white",
+    border: "none",
+    borderRadius: "5px",
+    cursor: "pointer",
+    fontSize: "13px",
+    maxWidth: "70px",
+  },
+};
   const [openDay, setOpenDay] = useState(null);
   const [openMealType, setOpenMealType] = useState({});
 

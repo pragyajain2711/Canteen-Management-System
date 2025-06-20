@@ -2,14 +2,15 @@ import React, { useState ,useContext} from 'react';
 import { AuthProvider, AuthContext } from './AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from './api';
- 
+ import {useTheme} from "../ThemeContext";
+
 function SignIn() {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
  const navigate = useNavigate();
  const { login } = useContext(AuthContext);
-
+ const {theme} =useTheme();
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -47,6 +48,8 @@ function SignIn() {
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f0f2f5',
+    backgroundColor: theme === "light" ? "#f8f9fa" : "#1a1a1a",
+    color: theme === "light" ? "#000" : "#fff",
   },
   form: {
     display: 'flex',

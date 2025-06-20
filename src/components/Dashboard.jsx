@@ -1,11 +1,12 @@
 import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './AuthContext';
+import {useTheme} from "../ThemeContext";
 
 function Dashboard() {
   const navigate = useNavigate();
   const { employee } = useContext(AuthContext);
-
+  const {theme} =useTheme();
   if (!employee) {
     return <div>Loading...</div>; // Prevent crash while data loads
   }
@@ -16,6 +17,8 @@ function Dashboard() {
       margin: '0 auto',
       padding: '20px',
       backgroundColor: '#f9f9f9',
+      backgroundColor: theme === "light" ? "#f8f9fa" : "#1a1a1a",
+    color: theme === "light" ? "#000" : "#fff",
       borderRadius: '10px',
       boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
     },
