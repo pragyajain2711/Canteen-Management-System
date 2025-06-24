@@ -3,13 +3,14 @@ import { AuthProvider, AuthContext } from './AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from './api';
  import {useTheme} from "../ThemeContext";
-
+import ForgotPasswordDialog from "./ForgotPasswordDialog";
 function SignIn() {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
  const navigate = useNavigate();
  const { login } = useContext(AuthContext);
+ const [showForgotPassword, setShowForgotPassword] = useState(false);
  const {theme} =useTheme();
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,11 +33,21 @@ function SignIn() {
         employeeId: response.data.employeeId,
         department: response.data.department
       };
-             login(response.data.token, employeeData);
+             login(response.data.token, employeeData,response.data.admin,response.data.superAdmin);
+      console.log("Login response:", response.data);
 
-      navigate('/dashboard');
+// In your handleSubmit function
+if (response.data.superAdmin) {
+  navigate('/superadmin-dashboard');
+} else if (response.data.admin) {
+  navigate('/admin-dashboard'); 
+} else {
+  navigate('/dashboard');
+}
     } catch (err) {
       setError(err.response?.data?.message || 'Sign in failed');
+      console.log("Error response:", err.response);
+
     }
   };
    
@@ -107,9 +118,24 @@ function SignIn() {
           onChange={e => setPassword(e.target.value)}
           style={styles.input}
         />
+        <div style={{ textAlign: 'right', marginBottom: '15px' }}>
+                <a 
+                    href="#" 
+                    onClick={(e) => {
+                        e.preventDefault();
+                        setShowForgotPassword(true);
+                    }}
+                    style={{ color: '#007bff', textDecoration: 'none' }}
+                >
+                    Forgot Password?
+                </a>
+            </div>
         {error && <div style={styles.error}>{error}</div>}
         <button type="submit" style={styles.button}>Sign In</button>
       </form>
+      {showForgotPassword && (
+            <ForgotPasswordDialog onClose={() => setShowForgotPassword(false)} />
+        )}
     </div>
   );
 }

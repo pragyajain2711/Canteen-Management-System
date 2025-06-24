@@ -26,7 +26,7 @@ function TodayMenu() {
 
       {Object.entries(todayMenu).map(([mealType, items]) => (
         <div key={mealType} style={{ marginBottom: "16px" }}>
-          {/* Toggle header */}
+          
           <div
             style={{
               ...styles.mealType,
@@ -46,7 +46,7 @@ function TodayMenu() {
             <span style={{ fontSize: "14px" }}>{openMealType[mealType] ? "▲" : "▼"}</span>
           </div>
 
-          {/* Table if open */}
+          
           {openMealType[mealType] && (
             <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "8px" }}>
               <thead>

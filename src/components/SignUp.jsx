@@ -8,6 +8,7 @@ function Sign_Up() {
     fullName: "",
     department: "",
     employeeId: "",
+     mobileNumber: "" ,
     password: "",
     confirmPassword: ""
   });
@@ -163,6 +164,15 @@ const {theme} =useTheme();
         required
         style={inputStyle}
       />
+      <label style={labelStyle}>Mobile Number</label>
+     <input
+    type="tel"
+    name="mobileNumber"
+    placeholder="Enter your mobile number"
+    value={formData.mobileNumber}
+    onChange={handleChange}
+    style={inputStyle}
+    />
 
       <label style={labelStyle}>Password</label>
       <input

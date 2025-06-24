@@ -85,7 +85,7 @@ function Navbar() {
         </button>
        {isAuthenticated ? (
           <>
-            <span style={{ marginRight: '10px' }}>Hi, {employee?.fullName}</span>
+            <span style={{ marginRight: '10px' }}> Hi, {employee?.fullName}</span>
             <button 
               onClick={logout}
               style={{ 
