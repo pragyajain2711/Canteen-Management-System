@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from './api';
@@ -5,27 +6,35 @@ import {useTheme} from "../ThemeContext";
 
 function Sign_Up() {
   const [formData, setFormData] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     department: "",
     employeeId: "",
-     mobileNumber: "" ,
+    mobileNumber: "",
+    customerType: "Employee", // Default value
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    isActive: true // Default to active
   });
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
-const {theme} =useTheme();
+  const {theme} = useTheme();
+
   const departments = [
     "Finance", "LPG", "IS", "HR", "Sales", "Reception", "Engineer", "Law"
   ];
 
+  const customerTypes = [
+    "Intern", "Employee", "Trainee", "Helper","Apprentice"
+  ];
+
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
     setError("");  
     setSuccess(""); 
@@ -62,6 +71,7 @@ const {theme} =useTheme();
     }
   };
 
+  
   const containerStyle = {
     maxWidth: "450px",
     margin: "50px auto",
@@ -129,16 +139,40 @@ const {theme} =useTheme();
       <div style={titleStyle}>Create Account</div>
       <div style={subTitleStyle}>Join our canteen community today</div>
 
-      <label style={labelStyle}>Full Name</label>
+      <label style={labelStyle}>First Name</label>
       <input
         type="text"
-        name="fullName"
-        placeholder="Enter your full name"
-        value={formData.fullName}
+        name="firstName"
+        placeholder="Enter your first name"
+        value={formData.firstName}
         onChange={handleChange}
         required
         style={inputStyle}
       />
+
+      <label style={labelStyle}>Last Name</label>
+      <input
+        type="text"
+        name="lastName"
+        placeholder="Enter your last name"
+        value={formData.lastName}
+        onChange={handleChange}
+        required
+        style={inputStyle}
+      />
+
+      <label style={labelStyle}>Customer Type</label>
+      <select
+        name="customerType"
+        value={formData.customerType}
+        onChange={handleChange}
+        required
+        style={inputStyle}
+      >
+        {customerTypes.map((type, index) => (
+          <option key={index} value={type}>{type}</option>
+        ))}
+      </select>
 
       <label style={labelStyle}>Department</label>
       <select
@@ -164,15 +198,28 @@ const {theme} =useTheme();
         required
         style={inputStyle}
       />
+
       <label style={labelStyle}>Mobile Number</label>
-     <input
-    type="tel"
-    name="mobileNumber"
-    placeholder="Enter your mobile number"
-    value={formData.mobileNumber}
-    onChange={handleChange}
-    style={inputStyle}
-    />
+      <input
+        type="tel"
+        name="mobileNumber"
+        placeholder="Enter your mobile number"
+        value={formData.mobileNumber}
+        onChange={handleChange}
+        style={inputStyle}
+      />
+
+      <label style={labelStyle}>Active Status</label>
+      <div style={{ marginBottom: '20px' }}>
+        <input
+          type="checkbox"
+          name="isActive"
+          checked={formData.isActive}
+          onChange={handleChange}
+          style={{ marginRight: '10px' }}
+        />
+        <span>Active Employee</span>
+      </div>
 
       <label style={labelStyle}>Password</label>
       <input
