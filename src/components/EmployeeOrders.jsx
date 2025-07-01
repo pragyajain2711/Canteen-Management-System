@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { 
-  Loader, Plus, X, CheckCircle, ChevronDown, ChevronUp,
-  ShoppingCart, Clock, Check, XCircle, AlertCircle
+  Loader, Plus, X, CheckCircle, ShoppingCart,
+  AlertCircle
 } from 'lucide-react';
 import api from './api';
+import {orderApi} from './api';
 import { useAuth } from './AuthContext';
 
 export default function EmployeeOrders() {
   // Authentication and user context
-  const { employee, isAdmin ,admin} = useAuth();
-  //const { employee = {}, isAdmin = false } = useAuth();
+  const { employee, isAdmin } = useAuth();
 
   // Order listing state
   const [orders, setOrders] = useState([]);
@@ -21,6 +21,7 @@ export default function EmployeeOrders() {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [orderContext, setOrderContext] = useState('self');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [showEmployeeIdField, setShowEmployeeIdField] = useState(false);
   const [menuItems, setMenuItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [deliveryDate, setDeliveryDate] = useState('');
@@ -30,48 +31,49 @@ export default function EmployeeOrders() {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [orderSuccessData, setOrderSuccessData] = useState(null);
 
-console.log("🔐 employee:", employee);
-console.log("🛡️ isAdmin:", isAdmin);
-console.log("📌 orderContext:", orderContext);
-console.log("🧍 selectedEmployeeId:", selectedEmployeeId);
+  // Fetch orders
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-const getEffectiveEmployeeId = () => {
-  if (!isAdmin) return employee?.employeeId;
-  return orderContext === 'employee' ? selectedEmployeeId : employee?.employeeId;
-};
+      // For admin ordering for employee
+      if (isAdmin && orderContext === 'employee') {
+        if (!selectedEmployeeId.trim()) {
+          setError("Please enter an employee ID");
+          setLoading(false);
+          return;
+        }
+      }
+
+      const effectiveEmployeeId = isAdmin && orderContext === 'employee' 
+        ? selectedEmployeeId 
+        : employee?.employeeId;
+
+      if (!effectiveEmployeeId) {
+        setError("Employee ID not available");
+        setLoading(false);
+        return;
+      }
+
+      const status = activeTab === 'current' 
+        ? ['PENDING', 'PREPARING', 'READY'].join(',')
+        : ['DELIVERED', 'CANCELLED'].join(',');
+
+     
+      const response = await orderApi.getEmployeeOrders(effectiveEmployeeId);
+      console.log("Full API Response:", response); // Debug log
 
 
-
-const fetchOrders = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-
-    const effectiveEmployeeId = getEffectiveEmployeeId();
-    console.log("✅ Effective Employee ID:", effectiveEmployeeId);
-
-    if (!effectiveEmployeeId) {
-      setError("Employee ID not available");
-      return;
+      setOrders(response.data || []);
+    } catch (err) {
+      console.error('Error:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to fetch orders');
+      setOrders([]);
+    } finally {
+      setLoading(false);
     }
-
-    const status = activeTab === 'current'
-      ? 'PENDING,PREPARING,READY'
-      : 'DELIVERED,CANCELLED';
-
-   
-
-    const response = await api.get(`/api/orders`); // no params
-console.log("📦 Orders API Response:", response.data);
-setOrders(response.data || []);
-
-  } catch (err) {
-    console.error('❌ Error fetching orders:', err);
-    setError(err.response?.data?.message || err.message || 'Failed to fetch orders');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Fetch menu items for order form
   const fetchMenuItems = async () => {
@@ -136,8 +138,24 @@ setOrders(response.data || []);
       setFormLoading(true);
       setFormError(null);
       
+      // Determine the employee ID for the order
+      let orderEmployeeId;
+      if (isAdmin && orderContext === 'employee') {
+        if (!selectedEmployeeId) {
+          setFormError('Please select an employee ID');
+          return;
+        }
+        orderEmployeeId = selectedEmployeeId;
+      } else {
+        if (!employee?.employeeId) {
+          setFormError('Employee ID not available');
+          return;
+        }
+        orderEmployeeId = employee.employeeId;
+      }
+
       const orderRequests = selectedItems.map(item => ({
-        employeeId: getEffectiveEmployeeId(),
+        employeeId: orderEmployeeId,
         menuId: item.menuId,
         quantity: item.quantity,
         expectedDeliveryDate: deliveryDate || new Date().toISOString().split('T')[0],
@@ -195,21 +213,25 @@ setOrders(response.data || []);
     );
   }
 
-  // Render error state
-  if (error && !showOrderForm) {
-    return (
-      <div className="bg-red-50 border-l-4 border-red-500 p-4">
-        <div className="flex items-center">
-          <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-          <span className="text-red-700">{error}</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Main component render
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {/* Global error display */}
+      {error && !error.includes("Please enter") && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+            <div>
+              <span className="text-red-700 font-medium">{error}</span>
+              {error.includes("not found") && (
+                <p className="text-sm text-red-600 mt-1">
+                  Please verify the employee ID is correct
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header and Controls */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">{isAdmin ? 'Orders Management' : 'My Orders'}</h1>
@@ -230,7 +252,11 @@ setOrders(response.data || []);
               <input
                 type="radio"
                 checked={orderContext === 'self'}
-                onChange={() => setOrderContext('self')}
+                onChange={() => {
+                  setOrderContext('self');
+                  setShowEmployeeIdField(false);
+                  setError(null);
+                }}
                 className="mr-2"
               />
               Order for myself
@@ -241,7 +267,8 @@ setOrders(response.data || []);
                 checked={orderContext === 'employee'}
                 onChange={() => {
                   setOrderContext('employee');
-                  setSelectedEmployeeId('');
+                  setShowEmployeeIdField(true);
+                  setError(null);
                 }}
                 className="mr-2"
               />
@@ -249,18 +276,26 @@ setOrders(response.data || []);
             </label>
           </div>
           
-          {orderContext === 'employee' && (
-            <div>
+          {showEmployeeIdField && (
+            <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Employee ID
+                Employee ID *
               </label>
               <input
                 type="text"
                 value={selectedEmployeeId}
-                onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedEmployeeId(e.target.value);
+                  if (error) setError(null);
+                }}
                 className="w-full border rounded-lg px-3 py-2"
                 placeholder="Enter employee ID"
               />
+              {error?.includes("Please enter") && (
+                <p className="mt-1 text-sm text-red-600">
+                  Please enter a valid employee ID
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -437,7 +472,7 @@ setOrders(response.data || []);
                               <div className="font-medium">{item.name}</div>
                               <div className="text-sm text-gray-600">${item.price.toFixed(2)} each</div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                                                        <div className="flex items-center space-x-2">
                               <button 
                                 onClick={() => handleQuantityChange(item.menuId, item.quantity - 1)}
                                 className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
@@ -467,7 +502,7 @@ setOrders(response.data || []);
                     </div>
                   </div>
 
-                                    {formError && (
+                  {formError && (
                     <div className="text-red-500 text-sm">{formError}</div>
                   )}
 

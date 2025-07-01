@@ -130,16 +130,31 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// Add response interceptor to catch 500 errors
-api.interceptors.response.use(response => response, error => {
-  if (error.response) {
-    console.error('API Error Response:', {
-      status: error.response.status,
-      data: error.response.data,
-      headers: error.response.headers,
-      config: error.config
+// Add this to your api.js interceptors
+api.interceptors.response.use(
+  response => {
+    console.log('API Response:', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data
     });
+    return response;
+  },
+  error => {
+    if (error.response) {
+      console.error('API Error:', {
+        url: error.config.url,
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+    } else {
+      console.error('API Error:', error.message);
+    }
+    return Promise.reject(error);
   }
-  return Promise.reject(error);
-});
+);
 export default api;
+
+
+
