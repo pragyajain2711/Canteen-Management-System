@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect ,useContext} from 'react';
 
 export const AuthContext = createContext();
 
@@ -50,3 +50,8 @@ const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     </AuthContext.Provider>
   );
 };
+
+// In AuthContext.jsx, add at the bottom:
+export function useAuth() {
+  return useContext(AuthContext);
+}

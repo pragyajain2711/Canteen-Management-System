@@ -8,18 +8,7 @@ const api = axios.create({
 });
 
 
-/*export const orderApi = {
-  placeOrder: (data) => api.post('/api/orders', data),
-  getEmployeeOrders: (employeeId, status) => 
-    api.get(`/api/orders/employee/${employeeId}`, { params: { status } }),
-  getAllOrders: (filters) => api.get('/api/orders', { params: filters }),
-  updateStatus: (orderId, status, remarks) => 
-    api.patch(`/api/orders/${orderId}/status`, null, { 
-      params: { status, remarks } 
-    }),
-  cancelOrder: (orderId) => api.delete(`/api/orders/${orderId}`),
-  searchOrders: (term) => api.get('/api/orders/search', { params: { term } }),
-};*/
+
 
 export const orderApi = {
   // Basic CRUD

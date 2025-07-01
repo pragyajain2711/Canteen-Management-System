@@ -108,6 +108,7 @@ import AdminOrderManagement from "./components/Admin/AdminOrderManagement";
 import WeeklyMenuManagement from "./components/Admin/WeeklyMenuManagement";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CanteenHomePage from "./components/CanteenHomePage";
+import EmployeeOrders from "./components/EmployeeOrders";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -124,7 +125,7 @@ function App() {
             <Route path="/sign_up" element={<SignUp />} />
             <Route path="/sign_in" element={<SignIn />} />
             <Route path="/menu" element={<EmployeeMenu />} />
-            <Route path="/cart" element={<Cart />} />
+            <Route path="/order" element={<EmployeeOrders />} />
             
             {/* Regular protected route */}
             <Route 
