@@ -1,4 +1,3 @@
-
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
@@ -64,39 +63,24 @@ const categories = [
 
 const units = ["piece", "plate", "bowl", "cup", "glass", "kg", "gram", "liter", "ml"]
 
-// Helper function to check if an item is currently active
 const isItemActive = (startDate, endDate) => {
   const now = new Date()
   const start = new Date(startDate)
   const end = new Date(endDate)
-
-  // Set time to start of day for accurate comparison
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
   const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
-
   return today >= startDay && today <= endDay
 }
 
-// Calendar Component
-function Calendar({ selected, onSelect, onClose }) {
+function Calendar({ selected, onSelect, onClose, minDate }) {
   const [viewDate, setViewDate] = useState(selected || new Date())
 
   const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate()
   const firstDayOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay()
   const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
   ]
 
   const days = []
@@ -107,25 +91,28 @@ function Calendar({ selected, onSelect, onClose }) {
 
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(viewDate.getFullYear(), viewDate.getMonth(), day)
-    const isSelected =
-      selected &&
-      date.getDate() === selected.getDate() &&
-      date.getMonth() === selected.getMonth() &&
-      date.getFullYear() === selected.getFullYear()
+    const isSelected = selected && date.getDate() === selected.getDate() && 
+      date.getMonth() === selected.getMonth() && date.getFullYear() === selected.getFullYear()
+    const isDisabled = minDate && date < minDate
 
     days.push(
       <button
         key={day}
         onClick={() => {
-          onSelect(date)
-          onClose()
+          if (!isDisabled) {
+            onSelect(date)
+            onClose()
+          }
         }}
-        className={`h-8 w-8 text-sm rounded-md hover:bg-blue-100 flex items-center justify-center ${
-          isSelected ? "bg-blue-500 text-white hover:bg-blue-600" : "text-gray-700"
+        className={`h-8 w-8 text-sm rounded-md flex items-center justify-center ${
+          isDisabled ? "text-gray-400 cursor-not-allowed" : 
+          isSelected ? "bg-blue-500 text-white hover:bg-blue-600" : 
+          "text-gray-700 hover:bg-blue-100"
         }`}
+        disabled={isDisabled}
       >
         {day}
-      </button>,
+      </button>
     )
   }
 
@@ -150,9 +137,7 @@ function Calendar({ selected, onSelect, onClose }) {
             className="text-sm border border-gray-300 rounded px-2 py-1"
           >
             {monthNames.map((month, index) => (
-              <option key={month} value={index}>
-                {month}
-              </option>
+              <option key={month} value={index}>{month}</option>
             ))}
           </select>
           <select
@@ -161,9 +146,7 @@ function Calendar({ selected, onSelect, onClose }) {
             className="text-sm border border-gray-300 rounded px-2 py-1"
           >
             {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
+              <option key={year} value={year}>{year}</option>
             ))}
           </select>
         </div>
@@ -172,20 +155,15 @@ function Calendar({ selected, onSelect, onClose }) {
         </button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-gray-500 mb-2">
-        <div className="h-6 flex items-center justify-center">Sun</div>
-        <div className="h-6 flex items-center justify-center">Mon</div>
-        <div className="h-6 flex items-center justify-center">Tue</div>
-        <div className="h-6 flex items-center justify-center">Wed</div>
-        <div className="h-6 flex items-center justify-center">Thu</div>
-        <div className="h-6 flex items-center justify-center">Fri</div>
-        <div className="h-6 flex items-center justify-center">Sat</div>
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+          <div key={day} className="h-6 flex items-center justify-center">{day}</div>
+        ))}
       </div>
       <div className="grid grid-cols-7 gap-1">{days}</div>
     </div>
   )
 }
 
-// Date Range Picker Component
 function DateRangePicker({
   startDate,
   endDate,
@@ -211,8 +189,8 @@ function DateRangePicker({
     if (startDate && endDate) {
       return `${format(startDate, "MMM dd, yyyy")} - ${format(endDate, "MMM dd, yyyy")}`
     } else if (startDate) {
-      return `${format(startDate, "MMM dd, yyyy")} - Select end date
-    `}
+      return `${format(startDate, "MMM dd, yyyy")} - Select end date`
+    }
     return placeholder
   }
 
@@ -230,7 +208,12 @@ function DateRangePicker({
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="bg-white border rounded-lg shadow-lg p-4 absolute z-50 mt-1 min-w-[280px]">
             <div className="mb-3 text-sm text-gray-600">{selectingStart ? "Select start date" : "Select end date"}</div>
-            <Calendar selected={selectingStart ? startDate : endDate} onSelect={handleDateSelect} onClose={() => {}} />
+            <Calendar 
+              selected={selectingStart ? startDate : endDate} 
+              onSelect={handleDateSelect} 
+              onClose={() => {}}
+              minDate={selectingStart ? new Date() : startDate}
+            />
             {startDate && (
               <div className="mt-3 pt-3 border-t">
                 <button
@@ -252,8 +235,7 @@ function DateRangePicker({
   )
 }
 
-// Simple Date Picker Component
-function DatePicker({ selected, onSelect, placeholder = "Select date" }) {
+function DatePicker({ selected, onSelect, placeholder = "Select date", minDate }) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -270,23 +252,18 @@ function DatePicker({ selected, onSelect, placeholder = "Select date" }) {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <Calendar selected={selected} onSelect={onSelect} onClose={() => setIsOpen(false)} />
+          <Calendar selected={selected} onSelect={onSelect} onClose={() => setIsOpen(false)} minDate={minDate} />
         </>
       )}
     </div>
   )
 }
 
-// Tooltip Component
 function Tooltip({ children, content }) {
   const [isVisible, setIsVisible] = useState(false)
 
   return (
-    <div
-      className="relative inline-block"
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-    >
+    <div className="relative inline-block" onMouseEnter={() => setIsVisible(true)} onMouseLeave={() => setIsVisible(false)}>
       {children}
       {isVisible && (
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-lg shadow-lg whitespace-nowrap z-50">
@@ -298,7 +275,7 @@ function Tooltip({ children, content }) {
   )
 }
 
- function MenuManagement() {
+export default function MenuManagement() {
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
@@ -308,10 +285,9 @@ function Tooltip({ children, content }) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isPriceHistoryDialogOpen, setIsPriceHistoryDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
-  const [priceHistory, setPriceHistory] = useState([])
   const [priceHistorySearch, setPriceHistorySearch] = useState("")
   const [priceHistoryDateRange, setPriceHistoryDateRange] = useState({ from: undefined, to: undefined })
-  const [originalPrice, setOriginalPrice] = useState(0) // Track original price for comparison
+  const [originalPrice, setOriginalPrice] = useState(0)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -321,28 +297,31 @@ function Tooltip({ children, content }) {
     price: 0,
     startDate: new Date(),
     endDate: new Date(),
-    category: "",
+    categories: [],
+    availableStatus: true,
   })
 
-  // Fetch menu items
   const { data: menuItems = [], isLoading } = useQuery({
     queryKey: ["menuItems"],
     queryFn: () => menuApi.getItems({}).then((res) => res.data),
   })
 
-  // Fixed price history search - properly handling unique entries
-  const { data: priceHistoryResults = [], isLoading: isSearchingPriceHistory } = useQuery({
+  const handleDeleteItem = async (id) => {
+  if (window.confirm("Are you sure you want to delete this menu item?")) {
+    await deleteMutation.mutateAsync(id)
+  }
+}
+  /*const { data: priceHistoryResults = [], isLoading: isSearchingPriceHistory } = useQuery({
     queryKey: ["priceHistory", priceHistorySearch, priceHistoryDateRange],
     queryFn: async () => {
       if (!priceHistorySearch) return []
 
       const matchingItems = menuItems.filter((item) =>
-        item.name.toLowerCase().includes(priceHistorySearch.toLowerCase()),
+        item.name.toLowerCase().includes(priceHistorySearch.toLowerCase())
       )
 
-      // Use Map to track unique entries with better key generation
       const uniqueHistories = new Map()
-      const processedItems = new Set() // Track which items we've processed
+      const processedItems = new Set()
 
       for (const item of matchingItems) {
         try {
@@ -351,11 +330,8 @@ function Tooltip({ children, content }) {
             endDate: priceHistoryDateRange.to ? priceHistoryDateRange.to.toISOString() : undefined,
           })
 
-          // Process API response - these are the actual price history records
           historyResponse.data.forEach((history) => {
-            // Create a more specific unique key using menuId and price combination
             const uniqueKey = `${item.menuId}-${history.price}`
-
             if (!uniqueHistories.has(uniqueKey)) {
               uniqueHistories.set(uniqueKey, {
                 ...history,
@@ -374,14 +350,11 @@ function Tooltip({ children, content }) {
             }
           })
 
-          // Mark this item as processed
           processedItems.add(item.menuId)
         } catch (error) {
-          // Only add current item if no price history exists AND we haven't processed this item yet
           if (!processedItems.has(item.menuId)) {
             console.warn(`No price history found for ${item.name}, showing current item`)
             const uniqueKey = `${item.menuId}-${item.price}`
-
             if (!uniqueHistories.has(uniqueKey)) {
               uniqueHistories.set(uniqueKey, {
                 menuId: item.menuId,
@@ -405,34 +378,64 @@ function Tooltip({ children, content }) {
         }
       }
 
-      // Convert Map values to array and sort by date (newest first)
       return Array.from(uniqueHistories.values()).sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
     },
     enabled: !!priceHistorySearch && menuItems.length > 0,
   })
+*/
 
-  // Filtered items with corrected active status
+// Replace the price history query with this simplified version
+const { data: priceHistoryResults = [], isLoading: isSearchingPriceHistory } = useQuery({
+    queryKey: ["priceHistory", priceHistorySearch, priceHistoryDateRange],
+    queryFn: async () => {
+        if (!priceHistorySearch) return [];
+        
+        try {
+            const response = await menuApi.getPriceHistory(priceHistorySearch, {
+                startDate: priceHistoryDateRange.from ? priceHistoryDateRange.from.toISOString() : undefined,
+                endDate: priceHistoryDateRange.to ? priceHistoryDateRange.to.toISOString() : undefined,
+            });
+            
+            // Process the response to ensure no duplicates
+            const uniqueEntries = [];
+            const seenPrices = new Set();
+            
+            response.data.forEach((entry) => {
+                // Use price + start date as unique key
+                const entryKey = `${entry.price}-${new Date(entry.startDate).getTime()}`;
+                
+                if (!seenPrices.has(entryKey)) {
+                    seenPrices.add(entryKey);
+                    uniqueEntries.push({
+                        ...entry,
+                        isActive: isItemActive(entry.startDate, entry.endDate),
+                    });
+                }
+            });
+            
+            return uniqueEntries;
+        } catch (error) {
+            console.error("Error fetching price history:", error);
+            return [];
+        }
+    },
+    enabled: !!priceHistorySearch,
+});
+
   const filteredItems = menuItems.filter((item) => {
-    const matchesSearch =
-      searchTerm === "" ||
+    const matchesSearch = searchTerm === "" ||
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
-
-    // Use corrected active status logic
     const itemIsActive = isItemActive(item.startDate, item.endDate)
     const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? itemIsActive : !itemIsActive)
-
-    const matchesDate =
-      !dateRange.from ||
-      !dateRange.to ||
+    const matchesDate = !dateRange.from || !dateRange.to ||
       (new Date(item.startDate) <= dateRange.to && new Date(item.endDate) >= dateRange.from)
 
     return matchesSearch && matchesCategory && matchesStatus && matchesDate
   })
 
-  // Mutations
   const createMutation = useMutation({
     mutationFn: (data) => menuApi.createItem(data),
     onSuccess: () => {
@@ -469,10 +472,7 @@ function Tooltip({ children, content }) {
   const handleUpdateItem = async () => {
     if (!selectedItem) return
 
-    // Check if price has changed
     const priceChanged = formData.price !== originalPrice
-
-    // If price changed, set start date to current date for new price history entry
     const updateData = {
       ...formData,
       startDate: priceChanged ? new Date().toISOString() : formData.startDate.toISOString(),
@@ -485,10 +485,6 @@ function Tooltip({ children, content }) {
     })
   }
 
-  const handleDeleteItem = async (id) => {
-    await deleteMutation.mutateAsync(id)
-  }
-
   const resetForm = () => {
     setFormData({
       name: "",
@@ -498,7 +494,8 @@ function Tooltip({ children, content }) {
       price: 0,
       startDate: new Date(),
       endDate: new Date(),
-      category: "",
+      categories: [],
+      availableStatus: true,
     })
     setSelectedItem(null)
     setOriginalPrice(0)
@@ -506,7 +503,7 @@ function Tooltip({ children, content }) {
 
   const openEditDialog = (item) => {
     setSelectedItem(item)
-    setOriginalPrice(item.price) // Store original price for comparison
+    setOriginalPrice(item.price)
     setFormData({
       name: item.name,
       description: item.description,
@@ -515,27 +512,17 @@ function Tooltip({ children, content }) {
       price: item.price,
       startDate: new Date(item.startDate),
       endDate: new Date(item.endDate),
-      category: item.category,
+      categories: [item.category],
+      availableStatus: item.availableStatus,
     })
     setIsEditDialogOpen(true)
   }
 
-  const openPriceHistoryDialog = (item) => {
-    setSelectedItem(item)
-    setPriceHistorySearch(item.name)
-    setIsPriceHistoryDialogOpen(true)
-  }
-
-  // Handle price change to automatically update start date
-  const handlePriceChange = (newPrice) => {
-    const priceChanged = newPrice !== originalPrice
-    setFormData({
-      ...formData,
-      price: newPrice,
-      // If price changed, set start date to today
-      startDate: priceChanged ? new Date() : formData.startDate,
-    })
-  }
+const openPriceHistoryDialog = (item) => {
+  setSelectedItem(item)
+  setPriceHistorySearch(item.name)
+  setIsPriceHistoryDialogOpen(true)
+}
 
   const formatDateTime = (dateString) => {
     return format(new Date(dateString), "MMM dd, yyyy HH:mm")
@@ -632,7 +619,6 @@ function Tooltip({ children, content }) {
             </div>
           </div>
 
-          {/* Enhanced Price History Results */}
           {priceHistoryResults.length > 0 && (
             <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
               <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -649,7 +635,6 @@ function Tooltip({ children, content }) {
                       <th className="text-left p-3 font-medium text-gray-700">Valid Period</th>
                       <th className="text-left p-3 font-medium text-gray-700">Status</th>
                       <th className="text-left p-3 font-medium text-gray-700">Created</th>
-                      <th className="text-left p-3 font-medium text-gray-700">Updated</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -715,26 +700,6 @@ function Tooltip({ children, content }) {
                                 </div>
                               </div>
                             </Tooltip>
-                          </td>
-                          <td className="p-3">
-                            {history.updatedAt ? (
-                              <Tooltip
-                                content={`Updated on ${formatFullDateTime(history.updatedAt)} by ${history.updatedBy || "System"}`}
-                              >
-                                <div className="text-xs cursor-help">
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3 text-gray-500" />
-                                    {format(new Date(history.updatedAt), "MMM dd")}
-                                  </div>
-                                  <div className="flex items-center gap-1 text-gray-500">
-                                    <User className="w-3 h-3" />
-                                    {history.updatedBy || "System"}
-                                  </div>
-                                </div>
-                              </Tooltip>
-                            ) : (
-                              <div className="text-xs text-gray-400 italic">Not available</div>
-                            )}
                           </td>
                         </tr>
                       )
@@ -835,8 +800,8 @@ function Tooltip({ children, content }) {
                 <th className="font-semibold p-4 text-left text-gray-700">Category</th>
                 <th className="font-semibold p-4 text-left text-gray-700">Valid Period</th>
                 <th className="font-semibold p-4 text-left text-gray-700">Status</th>
+                <th className="font-semibold p-4 text-left text-gray-700">Available</th>
                 <th className="font-semibold p-4 text-left text-gray-700">Created</th>
-                <th className="font-semibold p-4 text-left text-gray-700">Updated</th>
                 <th className="font-semibold p-4 text-left text-gray-700">Actions</th>
               </tr>
             </thead>
@@ -918,6 +883,53 @@ function Tooltip({ children, content }) {
                           {itemIsActive ? "Active" : "Inactive"}
                         </span>
                       </td>
+                     {/*} <td className="p-4">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                            item.availableStatus ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          <div className={`w-2 h-2 rounded-full ${item.availableStatus ? "bg-green-500" : "bg-red-500"}`} />
+                          {item.availableStatus ? "Available" : "Sold Out"}
+                        </span>
+                      </td>*/}
+
+                      
+{/*<td className="p-4">
+  <span
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+      item.availableStatus ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+    }`}
+  >
+    <div className={`w-2 h-2 rounded-full ${item.availableStatus ? "bg-green-500" : "bg-red-500"}`} />
+    {item.availableStatus ? "Available" : "Sold Out"}
+  </span>
+</td>*/}
+
+<td className="p-4">
+  <button
+    onClick={async (e) => {
+      e.stopPropagation(); // Prevent row click
+      const newStatus = !item.availableStatus;
+      try {
+        await menuApi.updateAvailability(item.id, newStatus);
+        queryClient.invalidateQueries(['menuItems']); // Refresh data
+      } catch (error) {
+        console.error("Failed to update availability:", error);
+        // Add error notification here if needed
+      }
+    }}
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs cursor-pointer ${
+      item.availableStatus ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+    }`}
+  >
+    <div className={`w-2 h-2 rounded-full ${
+      item.availableStatus ? "bg-green-500" : "bg-red-500"
+    }`} />
+    {item.availableStatus ? "Available" : "Sold Out"}
+  </button>
+</td>
+
                       <td className="p-4">
                         <div className="text-xs">
                           <Tooltip content={`Created on ${formatFullDateTime(item.createdAt)} by ${item.createdBy}`}>
@@ -929,22 +941,6 @@ function Tooltip({ children, content }) {
                               <div className="flex items-center gap-1 text-gray-500">
                                 <User className="w-3 h-3" />
                                 {item.createdBy}
-                              </div>
-                            </div>
-                          </Tooltip>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-xs">
-                          <Tooltip content={`Updated on ${formatFullDateTime(item.updatedAt)} by ${item.updatedBy}`}>
-                            <div className="cursor-help">
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-gray-500" />
-                                {format(new Date(item.updatedAt), "MMM dd")}
-                              </div>
-                              <div className="flex items-center gap-1 text-gray-500">
-                                <User className="w-3 h-3" />
-                                {item.updatedBy}
                               </div>
                             </div>
                           </Tooltip>
@@ -1017,23 +1013,26 @@ function Tooltip({ children, content }) {
                   className="w-full border border-gray-300 rounded-md p-2"
                 />
               </div>
+              
               <div className="space-y-2">
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                  Category
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md p-2"
-                >
-                  <option value="">Select category</option>
-                  {categories.map((category) => (
-                    <option key={category.value} value={category.value}>
-                      {category.label}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700">Available Status</label>
+                <div className="flex items-center">
+                  <span className="mr-2 text-sm font-medium">
+                    {formData.availableStatus ? 'Available' : 'Sold Out'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({...formData, availableStatus: !formData.availableStatus})}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full 
+                      ${formData.availableStatus ? 'bg-green-600' : 'bg-gray-200'}`}
+                  >
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition 
+                      ${formData.availableStatus ? 'translate-x-6' : 'translate-x-1'}`}
+                    />
+                  </button>
+                </div>
               </div>
+
               <div className="md:col-span-2 space-y-2">
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700">
                   Description
@@ -1044,8 +1043,10 @@ function Tooltip({ children, content }) {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Enter item description"
                   className="w-full border border-gray-300 rounded-md p-2"
+                  rows={3}
                 />
               </div>
+
               <div className="space-y-2">
                 <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
                   Quantity
@@ -1053,12 +1054,15 @@ function Tooltip({ children, content }) {
                 <input
                   id="quantity"
                   type="number"
+                  min="0"
+                  step="0.1"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
                   placeholder="Enter quantity"
                   className="w-full border border-gray-300 rounded-md p-2"
                 />
               </div>
+
               <div className="space-y-2">
                 <label htmlFor="unit" className="block text-sm font-medium text-gray-700">
                   Unit
@@ -1076,6 +1080,7 @@ function Tooltip({ children, content }) {
                   ))}
                 </select>
               </div>
+
               <div className="space-y-2">
                 <label htmlFor="price" className="block text-sm font-medium text-gray-700">
                   Price (₹)
@@ -1083,25 +1088,70 @@ function Tooltip({ children, content }) {
                 <input
                   id="price"
                   type="number"
+                  min="0"
+                  step="0.01"
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                   placeholder="Enter price"
                   className="w-full border border-gray-300 rounded-md p-2"
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Categories</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {categories.map((category) => (
+                    <div key={category.value} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`category-${category.value}`}
+                        checked={formData.categories?.includes(category.value) || false}
+                        onChange={(e) => {
+                          const newCategories = e.target.checked
+                            ? [...(formData.categories || []), category.value]
+                            : (formData.categories || []).filter(c => c !== category.value);
+                          setFormData({...formData, categories: newCategories});
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor={`category-${category.value}`} className="ml-2 text-sm text-gray-700">
+                        {category.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Valid From</label>
                 <DatePicker
                   selected={formData.startDate}
-                  onSelect={(date) => setFormData({ ...formData, startDate: date })}
+                  onSelect={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (date < today) {
+                      alert("Start date cannot be in the past");
+                      return;
+                    }
+                    setFormData({...formData, startDate: date});
+                  }}
+                  minDate={new Date()}
                   placeholder="Pick a date"
                 />
               </div>
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Valid Until</label>
                 <DatePicker
                   selected={formData.endDate}
-                  onSelect={(date) => setFormData({ ...formData, endDate: date })}
+                  onSelect={(date) => {
+                    if (date < formData.startDate) {
+                      alert("End date cannot be before start date");
+                      return;
+                    }
+                    setFormData({...formData, endDate: date});
+                  }}
+                  minDate={formData.startDate}
                   placeholder="Pick a date"
                 />
               </div>
@@ -1116,9 +1166,19 @@ function Tooltip({ children, content }) {
               </button>
               <button
                 onClick={handleCreateItem}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2"
+                disabled={createMutation.isLoading || !formData.name || !formData.categories?.length}
+                className={`bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 ${
+                  createMutation.isLoading || !formData.name || !formData.categories?.length ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
-                Create Item
+                {createMutation.isLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Item"
+                )}
               </button>
             </div>
           </div>
@@ -1157,23 +1217,46 @@ function Tooltip({ children, content }) {
                   className="w-full border border-gray-300 rounded-md p-2"
                 />
               </div>
+
+          {/*}    <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Available Status</label>
+                <div className="flex items-center">
+                  <span className="mr-2 text-sm font-medium">
+                    {formData.availableStatus ? 'Available' : 'Sold Out'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({...formData, availableStatus: !formData.availableStatus})}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full 
+                      ${formData.availableStatus ? 'bg-green-600' : 'bg-gray-200'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition 
+                      ${formData.availableStatus ? 'translate-x-6' : 'translate-x-1'}`}
+                    />
+                  </button>
+                </div>
+              </div>*/}
+
+
               <div className="space-y-2">
-                <label htmlFor="edit-category" className="block text-sm font-medium text-gray-700">
-                  Category
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md p-2"
-                >
-                  <option value="">Select category</option>
-                  {categories.map((category) => (
-                    <option key={category.value} value={category.value}>
-                      {category.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+  <label className="block text-sm font-medium text-gray-700">Available Status</label>
+  <div className="flex items-center">
+    <span className="mr-2 text-sm font-medium">
+      {formData.availableStatus ? 'Available' : 'Sold Out'}
+    </span>
+    <button
+      type="button"
+      onClick={() => setFormData({...formData, availableStatus: !formData.availableStatus})}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full 
+        ${formData.availableStatus ? 'bg-green-600' : 'bg-gray-200'}`}
+    >
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition 
+        ${formData.availableStatus ? 'translate-x-6' : 'translate-x-1'}`}
+      />
+    </button>
+  </div>
+</div>
+
               <div className="md:col-span-2 space-y-2">
                 <label htmlFor="edit-description" className="block text-sm font-medium text-gray-700">
                   Description
@@ -1184,8 +1267,10 @@ function Tooltip({ children, content }) {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Enter item description"
                   className="w-full border border-gray-300 rounded-md p-2"
+                  rows={3}
                 />
               </div>
+
               <div className="space-y-2">
                 <label htmlFor="edit-quantity" className="block text-sm font-medium text-gray-700">
                   Quantity
@@ -1193,12 +1278,15 @@ function Tooltip({ children, content }) {
                 <input
                   id="edit-quantity"
                   type="number"
+                  min="0"
+                  step="0.1"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
                   placeholder="Enter quantity"
                   className="w-full border border-gray-300 rounded-md p-2"
                 />
               </div>
+
               <div className="space-y-2">
                 <label htmlFor="edit-unit" className="block text-sm font-medium text-gray-700">
                   Unit
@@ -1216,6 +1304,7 @@ function Tooltip({ children, content }) {
                   ))}
                 </select>
               </div>
+
               <div className="space-y-2">
                 <label htmlFor="edit-price" className="block text-sm font-medium text-gray-700">
                   Price (₹)
@@ -1223,25 +1312,77 @@ function Tooltip({ children, content }) {
                 <input
                   id="edit-price"
                   type="number"
+                  min="0"
+                  step="0.01"
                   value={formData.price}
-                  onChange={(e) => handlePriceChange(Number(e.target.value))}
+                  onChange={(e) => {
+                    const newPrice = Number(e.target.value);
+                    setFormData({
+                      ...formData,
+                      price: newPrice,
+                      startDate: newPrice !== originalPrice ? new Date() : formData.startDate
+                    });
+                  }}
                   placeholder="Enter price"
                   className="w-full border border-gray-300 rounded-md p-2"
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Categories</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {categories.map((category) => (
+                    <div key={category.value} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`edit-category-${category.value}`}
+                        checked={formData.categories?.includes(category.value) || false}
+                        onChange={(e) => {
+                          const newCategories = e.target.checked
+                            ? [...(formData.categories || []), category.value]
+                            : (formData.categories || []).filter(c => c !== category.value);
+                          setFormData({...formData, categories: newCategories});
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor={`edit-category-${category.value}`} className="ml-2 text-sm text-gray-700">
+                        {category.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Valid From</label>
                 <DatePicker
                   selected={formData.startDate}
-                  onSelect={(date) => setFormData({ ...formData, startDate: date })}
+                  onSelect={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (date < today) {
+                      alert("Start date cannot be in the past for price changes");
+                      return;
+                    }
+                    setFormData({...formData, startDate: date});
+                  }}
+                  minDate={formData.price !== originalPrice ? new Date() : null}
                   placeholder="Pick a date"
                 />
               </div>
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Valid Until</label>
                 <DatePicker
                   selected={formData.endDate}
-                  onSelect={(date) => setFormData({ ...formData, endDate: date })}
+                  onSelect={(date) => {
+                    if (date < formData.startDate) {
+                      alert("End date cannot be before start date");
+                      return;
+                    }
+                    setFormData({...formData, endDate: date});
+                  }}
+                  minDate={formData.startDate}
                   placeholder="Pick a date"
                 />
               </div>
@@ -1256,15 +1397,24 @@ function Tooltip({ children, content }) {
               </button>
               <button
                 onClick={handleUpdateItem}
-                className="bg-orange-600 hover:bg-orange-700 text-white rounded-md px-4 py-2"
+                disabled={updateMutation.isLoading || !formData.name || !formData.categories?.length}
+                className={`bg-orange-600 hover:bg-orange-700 text-white rounded-md px-4 py-2 ${
+                  updateMutation.isLoading || !formData.name || !formData.categories?.length ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
-                Update Item
+                {updateMutation.isLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Item"
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
-      
 
       {/* Price History Dialog */}
       {isPriceHistoryDialogOpen && (
@@ -1283,14 +1433,14 @@ function Tooltip({ children, content }) {
 
             <div className="space-y-4">
               <table className="w-full">
-                <thead>
+               {/*} <thead>
                   <tr className="border-b bg-gray-50">
                     <th className="font-semibold p-3 text-left">Price</th>
                     <th className="font-semibold p-3 text-left">Valid From</th>
                     <th className="font-semibold p-3 text-left">Valid Until</th>
                     <th className="font-semibold p-3 text-left">Status</th>
-                    <th className="font-semibold p-3 text-left">Updated By</th>
-                    <th className="font-semibold p-3 text-left">Updated At</th>
+                    <th className="font-semibold p-3 text-left">Created By</th>
+                    <th className="font-semibold p-3 text-left">Created At</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1332,23 +1482,81 @@ function Tooltip({ children, content }) {
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-blue-600" />
-                            <span className="text-blue-700 font-medium">{history.updatedBy || "System"}</span>
+                            <span className="text-blue-700 font-medium">{history.createdBy || "System"}</span>
                           </div>
                         </td>
                         <td className="p-3">
-                          {history.updatedAt ? (
-                            <Tooltip content={formatFullDateTime(history.updatedAt)}>
-                              <div className="text-sm text-gray-600 cursor-help">
-                                {formatDateTime(history.updatedAt)}
-                              </div>
-                            </Tooltip>
-                          ) : (
-                            <div className="text-sm text-gray-400 italic">Not available</div>
-                          )}
+                          <Tooltip content={formatFullDateTime(history.createdAt)}>
+                            <div className="text-sm text-gray-600 cursor-help">
+                              {formatDateTime(history.createdAt)}
+                            </div>
+                          </Tooltip>
                         </td>
                       </tr>
                     ))}
-                </tbody>
+                </tbody>*/}
+
+<thead>
+    <tr className="border-b bg-gray-50">
+        <th className="font-semibold p-3 text-left">Price</th>
+        <th className="font-semibold p-3 text-left">Valid From</th>
+        <th className="font-semibold p-3 text-left">Valid Until</th>
+        <th className="font-semibold p-3 text-left">Status</th>
+        <th className="font-semibold p-3 text-left">Created By</th>
+        <th className="font-semibold p-3 text-left">Created At</th>
+    </tr>
+</thead>
+<tbody>
+    {priceHistoryResults.map((history, index) => (
+        <tr key={`${history.price}-${index}`} className="hover:bg-gray-50 border-b">
+            <td className="p-3">
+                <span className="font-semibold text-green-700">₹{history.price}</span>
+            </td>
+            <td className="p-3">
+                <Tooltip content={formatFullDateTime(history.startDate)}>
+                    <div className="flex items-center gap-2 cursor-help">
+                        <Clock className="w-4 h-4 text-gray-500" />
+                        {formatDateTime(history.startDate)}
+                    </div>
+                </Tooltip>
+            </td>
+            <td className="p-3">
+                <Tooltip content={formatFullDateTime(history.endDate)}>
+                    <div className="flex items-center gap-2 cursor-help">
+                        <Clock className="w-4 h-4 text-gray-500" />
+                        {formatDateTime(history.endDate)}
+                    </div>
+                </Tooltip>
+            </td>
+            <td className="p-3">
+                <span
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                        history.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                    }`}
+                >
+                    <div
+                        className={`w-2 h-2 rounded-full ${history.isActive ? "bg-green-500" : "bg-red-500"}`}
+                    />
+                    {history.isActive ? "Active" : "Expired"}
+                </span>
+            </td>
+            <td className="p-3">
+                <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-600" />
+                    <span className="text-blue-700 font-medium">{history.createdBy || "System"}</span>
+                </div>
+            </td>
+            <td className="p-3">
+                <Tooltip content={formatFullDateTime(history.createdAt)}>
+                    <div className="text-sm text-gray-600 cursor-help">
+                        {formatDateTime(history.createdAt)}
+                    </div>
+                </Tooltip>
+            </td>
+        </tr>
+    ))}
+</tbody>
+
               </table>
             </div>
 
@@ -1366,5 +1574,3 @@ function Tooltip({ children, content }) {
     </div>
   )
 }
-
-export default MenuManagement;

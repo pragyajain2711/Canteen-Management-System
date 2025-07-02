@@ -79,6 +79,9 @@ export const menuApi = {
   createItem: (data) => api.post('api/menu/items', data),
   updateItem: (id, data) => api.put(`api/menu/items/${id}`, data),
   deleteItem: (id) => api.delete(`api/menu/items/${id}`),
+  updateAvailability: (id, availableStatus) => {
+  return api.patch(`api/menu/items/${id}/availability`, { availableStatus });
+}
 };
 
 
