@@ -13,6 +13,7 @@ import Pcanteen.Backend.config.AppConfig;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -154,36 +155,9 @@ public class MenuItemService {
                 .collect(Collectors.toList());
     }
 
-   /* public List<PriceHistoryDTO> getPriceHistory(String name) {
-        return menuItemRepository.findPriceHistoryByName(name).stream()
-                .map(item -> {
-                    PriceHistoryDTO dto = modelMapper.map(item, PriceHistoryDTO.class);
-                    LocalDateTime now = LocalDateTime.now();
-                    dto.setWasActive(!now.isBefore(item.getStartDate()) && !now.isAfter(item.getEndDate()));
-                    return dto;
-                })
-                .collect(Collectors.toList());
-    }*/
-   /* public List<PriceHistoryDTO> getPriceHistory(String name) {
-        // Get all items with this name, ordered by creation date (newest first)
-        List<MenuItem> items = menuItemRepository.findByNameOrderByCreatedAtDesc(name);
-        
-        return items.stream()
-            .map(item -> {
-                PriceHistoryDTO dto = new PriceHistoryDTO();
-                dto.setPrice(item.getPrice());
-                dto.setStartDate(item.getStartDate());
-                dto.setEndDate(item.getEndDate());
-                dto.setWasActive(isItemActive(item));
-                dto.setCreatedAt(item.getCreatedAt());
-                dto.setCreatedBy(item.getCreatedBy());
-                return dto;
-            })
-            .collect(Collectors.toList());
-    }*/
-    
+   
  // MenuItemService.java
-    public List<PriceHistoryDTO> getPriceHistory(String name, String category) {
+  /*  public List<PriceHistoryDTO> getPriceHistory(String name, String category) {
         return menuItemRepository.findPriceHistoryByNameAndCategory(name, category)
                 .stream()
                 .map(item -> {
@@ -193,12 +167,44 @@ public class MenuItemService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+    }*/
+    
+ // MenuItemService.java
+    public List<PriceHistoryDTO> getPriceHistory(String name, String category) {
+        // Get all items with the same name regardless of category
+        List<MenuItem> allItems = menuItemRepository.findByNameOrderByCreatedAtDesc(name);
+        
+        // Filter by category if specified
+        List<MenuItem> filteredItems = category == null ? 
+            allItems : 
+            allItems.stream().filter(item -> item.getCategory().equals(category)).collect(Collectors.toList());
+        
+        // Also get all categories this item exists in
+        Set<String> allCategories = allItems.stream()
+            .map(MenuItem::getCategory)
+            .collect(Collectors.toSet());
+        
+        return filteredItems.stream()
+            .map(item -> {
+                PriceHistoryDTO dto = new PriceHistoryDTO();
+                dto.setId(item.getId());
+                dto.setMenuId(item.getMenuId());
+                dto.setName(item.getName());
+                dto.setCategory(item.getCategory());
+                dto.setPrice(item.getPrice());
+                dto.setStartDate(item.getStartDate());
+                dto.setEndDate(item.getEndDate());
+                dto.setIsActive(isItemActive(item));
+                dto.setCreatedAt(item.getCreatedAt());
+                dto.setCreatedBy(item.getCreatedBy());
+                dto.setAvailableStatus(item.getAvailableStatus());
+                dto.setAllCategories(allCategories); // Add all available categories
+                return dto;
+            })
+            .collect(Collectors.toList());
     }
 
-   /* private boolean isItemActive(MenuItem item) {
-        LocalDateTime now = LocalDateTime.now();
-        return !now.isBefore(item.getStartDate()) && !now.isAfter(item.getEndDate());
-    }*/
+ 
 
     public MenuItemDTO updateAvailability(Long id, Boolean availableStatus, String updatedBy) {
         MenuItem item = menuItemRepository.findById(id)

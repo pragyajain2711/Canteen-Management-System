@@ -86,6 +86,7 @@ package Pcanteen.Backend.dto;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Data
 public class PriceHistoryDTO {
@@ -93,6 +94,24 @@ public class PriceHistoryDTO {
     private String menuId;
     private String name;
     private String category;
+    public PriceHistoryDTO(Long id, String menuId, String name, String category, Set<String> allCategories,
+			Double price, LocalDateTime startDate, LocalDateTime endDate, Boolean isActive, LocalDateTime createdAt,
+			String createdBy, Boolean availableStatus) {
+		super();
+		this.id = id;
+		this.menuId = menuId;
+		this.name = name;
+		this.category = category;
+		this.allCategories = allCategories;
+		this.price = price;
+		this.startDate = startDate;
+		this.endDate = endDate;
+		this.isActive = isActive;
+		this.createdAt = createdAt;
+		this.createdBy = createdBy;
+		this.availableStatus = availableStatus;
+	}
+	private Set<String> allCategories;
     private Double price;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
@@ -124,8 +143,16 @@ public class PriceHistoryDTO {
 	public void setCategory(String category) {
 		this.category = category;
 	}
+	
+	
 	public Double getPrice() {
 		return price;
+	}
+	public Set<String> getAllCategories() {
+		return allCategories;
+	}
+	public void setAllCategories(Set<String> allCategories) {
+		this.allCategories = allCategories;
 	}
 	public void setPrice(Double price) {
 		this.price = price;
@@ -166,7 +193,7 @@ public class PriceHistoryDTO {
 	public void setAvailableStatus(Boolean availableStatus) {
 		this.availableStatus = availableStatus;
 	}
-	public PriceHistoryDTO(Long id, String menuId, String name, String category, Double price, LocalDateTime startDate,
+	/*public PriceHistoryDTO(Long id, String menuId, String name, String category, Double price, LocalDateTime startDate,
 			LocalDateTime endDate, Boolean isActive, LocalDateTime createdAt, String createdBy,
 			Boolean availableStatus) {
 		super();
@@ -181,11 +208,14 @@ public class PriceHistoryDTO {
 		this.createdAt = createdAt;
 		this.createdBy = createdBy;
 		this.availableStatus = availableStatus;
-	}
+	}*/
+	
+	
 	public PriceHistoryDTO() {
 		super();
 		// TODO Auto-generated constructor stub
 	}
+	
 
     // Constructors, getters and setters are handled by @Data
     
