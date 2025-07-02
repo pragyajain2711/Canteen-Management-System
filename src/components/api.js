@@ -77,10 +77,11 @@ export const menuApi = {
   getFilteredItems: (filters) => api.get('api/menu/items/filter', { params: filters }),
  // getPriceHistory: (name) => api.get('api/menu/items/price-history', { params: { name } }),
  // api.js
+// api.js
 getPriceHistory: (name, category, dateRange) => api.get('api/menu/items/price-history', { 
   params: { 
     name,
-    category,
+    category: category || undefined,
     startDate: dateRange?.from?.toISOString(),
     endDate: dateRange?.to?.toISOString()
   } 

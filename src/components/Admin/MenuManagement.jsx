@@ -290,6 +290,7 @@ export default function MenuManagement() {
   const [originalPrice, setOriginalPrice] = useState(0)
 const [priceHistoryCategory, setPriceHistoryCategory] = useState("");
 //const [isSearchingPriceHistory, setIsSearchingPriceHistory] = useState(false);
+const [showAllCategories, setShowAllCategories] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -425,9 +426,26 @@ const [priceHistoryCategory, setPriceHistoryCategory] = useState("");
 });
 */}
 
+const { 
+  data: priceHistoryResults = [], 
+  isLoading: isSearchingPriceHistory,
+  error: priceHistoryError 
+} = useQuery({
+  queryKey: ["priceHistory", priceHistorySearch, showAllCategories ? null : priceHistoryCategory, priceHistoryDateRange],
+  queryFn: async () => {
+    if (!priceHistorySearch) return [];
+    const response = await menuApi.getPriceHistory(
+      priceHistorySearch, 
+      showAllCategories ? undefined : priceHistoryCategory,
+      priceHistoryDateRange
+    );
+    return response.data;
+  },
+  enabled: !!priceHistorySearch,
+});
 
 // In the price history query section:
-const { 
+/*const { 
   data: priceHistoryResults = [], 
   isLoading: isSearchingPriceHistory,
   error: priceHistoryError 
@@ -446,28 +464,9 @@ const {
     }));
   },
   enabled: !!priceHistorySearch,
-});
-
-/*const { 
-  data: priceHistoryResults = [], 
-  isLoading: isSearchingPriceHistory,
-  error: priceHistoryError 
-} = useQuery({
-  queryKey: ["priceHistory", priceHistorySearch, priceHistoryCategory, priceHistoryDateRange],
-  queryFn: async () => {
-    if (!priceHistorySearch || !priceHistoryCategory) return [];
-    const response = await menuApi.getPriceHistory(
-      priceHistorySearch, 
-      priceHistoryCategory,
-      {
-        startDate: priceHistoryDateRange.from?.toISOString(),
-        endDate: priceHistoryDateRange.to?.toISOString()
-      }
-    );
-    return response.data;
-  },
-  enabled: !!priceHistorySearch && !!priceHistoryCategory,
 });*/
+
+
   const filteredItems = menuItems.filter((item) => {
     const matchesSearch = searchTerm === "" ||
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -596,174 +595,112 @@ const openPriceHistoryDialog = (item) => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <ChefHat className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
-              <p className="text-gray-600">Manage and organize your menu items with price history</p>
-            </div>
-          </div>
-        </div>
+ <div className="bg-white rounded-lg border border-gray-200 p-6">
+  {/* Filter Controls - All in one line */}
+  <div className="flex flex-wrap items-end gap-4 mb-4">
+    {/* Search Input */}
+    <div className="flex-1 min-w-[200px]">
+      <label htmlFor="price-search" className="text-sm font-medium text-gray-700 block mb-1">
+        Search Items
+      </label>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <input
+          id="price-search"
+          placeholder="Enter item name..."
+          value={priceHistorySearch}
+          onChange={(e) => setPriceHistorySearch(e.target.value)}
+          className="pl-10 border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md w-full p-2"
+        />
       </div>
+    </div>
 
-      {/* Price History Search Section */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-xl text-gray-900 font-bold">Price History Search</h2>
-              <p className="text-gray-600 text-sm">
-                Search for item price history by name and date range to see all price changes with menu details
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="price-search" className="text-sm font-medium text-gray-700 block">
-                Item Name
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  id="price-search"
-                  placeholder="Enter item name..."
-                  value={priceHistorySearch}
-                  onChange={(e) => setPriceHistorySearch(e.target.value)}
-                  className="pl-10 border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md w-full p-2"
-                />
-              </div>
-            </div>
+    {/* Category Filter */}
+    {!showAllCategories && (
+      <div className="flex-1 min-w-[180px]">
+        <label className="text-sm font-medium text-gray-700 block mb-1">Category</label>
+        <select
+          value={priceHistoryCategory}
+          onChange={(e) => setPriceHistoryCategory(e.target.value)}
+          className="w-full border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md p-2"
+        >
+          <option value="all">All Categories</option>
+          {categories.map((category) => (
+            <option key={category.value} value={category.value}>
+              {category.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 block">Date Range (Optional)</label>
-              <DateRangePicker
-                startDate={priceHistoryDateRange.from}
-                endDate={priceHistoryDateRange.to}
-                onStartDateSelect={(date) => setPriceHistoryDateRange({ ...priceHistoryDateRange, from: date })}
-                onEndDateSelect={(date) => setPriceHistoryDateRange({ ...priceHistoryDateRange, to: date })}
-                placeholder="Select date range"
-              />
-            </div>
+    {/* Date Range */}
+    <div className="flex-1 min-w-[250px]">
+      <label className="text-sm font-medium text-gray-700 block mb-1">Date Range</label>
+      <DateRangePicker
+        startDate={priceHistoryDateRange.from}
+        endDate={priceHistoryDateRange.to}
+        onStartDateSelect={(date) => setPriceHistoryDateRange({ ...priceHistoryDateRange, from: date })}
+        onEndDateSelect={(date) => setPriceHistoryDateRange({ ...priceHistoryDateRange, to: date })}
+        placeholder="Select date range"
+      />
+    </div>
 
-            <div className="flex items-end">
-              <button
-                disabled={isSearchingPriceHistory || !priceHistorySearch.trim()}
-                className={`w-full bg-blue-600 hover:bg-blue-700 text-white rounded-md p-2 flex items-center justify-center ${
-                  isSearchingPriceHistory || !priceHistorySearch.trim() ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-              >
-                {isSearchingPriceHistory ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <History className="w-4 h-4 mr-2" />
-                    Search History
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+    {/* Show All Toggle */}
+    <div className="flex items-center gap-2 mb-1">
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          checked={showAllCategories}
+          onChange={() => setShowAllCategories(!showAllCategories)}
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+        Show all categories
+      </label>
+    </div>
 
-          {priceHistoryResults.length > 0 && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
-              <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <History className="w-4 h-4 text-blue-600" />
-                Price History for "{priceHistorySearch}" ({priceHistoryResults.length} unique records)
-              </h4>
-              <div className="overflow-x-auto">
+    {/* Search Button */}
+    <button
+      disabled={isSearchingPriceHistory || !priceHistorySearch.trim()}
+      className={`bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2 h-[42px] flex items-center justify-center ${
+        isSearchingPriceHistory || !priceHistorySearch.trim() ? "opacity-50 cursor-not-allowed" : ""
+      }`}
+    >
+      {isSearchingPriceHistory ? (
+        <>
+          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+          Searching...
+        </>
+      ) : (
+        <>
+          <Search className="w-4 h-4 mr-2" />
+          Search
+        </>
+      )}
+    </button>
+  </div>
+
+  {/* Status Message */}
+  {priceHistoryResults.length > 0 && (
+    <div className="text-sm text-gray-600 mb-4 flex items-center gap-2">
+      <span>Showing {priceHistoryResults.length} results for "{priceHistorySearch}"</span>
+      {!showAllCategories && priceHistoryCategory !== 'all' && (
+        <span className="text-xs px-2 py-1 rounded-full bg-gray-100">
+          in {categories.find(c => c.value === priceHistoryCategory)?.label || 'selected'} category
+        </span>
+      )}
+      {priceHistoryDateRange.from && priceHistoryDateRange.to && (
+        <span className="text-xs px-2 py-1 rounded-full bg-gray-100">
+          from {format(priceHistoryDateRange.from, "MMM dd, yyyy")} to {format(priceHistoryDateRange.to, "MMM dd, yyyy")}
+        </span>
+      )}
+    </div>
+  )}
+
+  {/* Results Table - remains the same */}
+  {priceHistoryResults.length > 0 && (
+    <div className="overflow-x-auto">
                 <table className="w-full bg-white rounded-lg">
-                  {/*<thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-3 font-medium text-gray-700">Menu ID</th>
-                      <th className="text-left p-3 font-medium text-gray-700">Price</th>
-                      <th className="text-left p-3 font-medium text-gray-700">Category</th>
-                      <th className="text-left p-3 font-medium text-gray-700">Valid Period</th>
-                      <th className="text-left p-3 font-medium text-gray-700">Status</th>
-                      <th className="text-left p-3 font-medium text-gray-700">Created</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {priceHistoryResults.map((history, index) => {
-                      const categoryData = getCategoryData(history.category)
-                      const CategoryIcon = categoryData.icon
-
-                      return (
-                        <tr key={`${history.menuId}-${index}`} className="hover:bg-gray-50 border-b">
-                          <td className="p-3">
-                            <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{history.menuId}</span>
-                          </td>
-                          <td className="p-3">
-                            <span className="font-semibold text-green-700">₹{history.price}</span>
-                          </td>
-                          <td className="p-3">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${categoryData.color}`}
-                            >
-                              <CategoryIcon className={`w-3 h-3 ${categoryData.iconColor}`} />
-                              {categoryData.label}
-                            </span>
-                          </td>
-                          <td className="p-3">
-                            <Tooltip
-                              content={`${formatFullDateTime(history.startDate)} to ${formatFullDateTime(history.endDate)}`}
-                            >
-                              <div className="text-xs cursor-help">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-gray-500" />
-                                  <span className="whitespace-nowrap">
-                                    {format(new Date(history.startDate), "MMM dd")} -{" "}
-                                    {format(new Date(history.endDate), "MMM dd")}
-                                  </span>
-                                </span>
-                              </div>
-                            </Tooltip>
-                          </td>
-                          <td className="p-3">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                                history.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              <div
-                                className={`w-2 h-2 rounded-full ${history.isActive ? "bg-green-500" : "bg-red-500"}`}
-                              />
-                              {history.isActive ? "Active" : "Expired"}
-                            </span>
-                          </td>
-                          <td className="p-3">
-                            <Tooltip
-                              content={`Created on ${formatFullDateTime(history.createdAt)} by ${history.createdBy}`}
-                            >
-                              <div className="text-xs cursor-help">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-gray-500" />
-                                  {format(new Date(history.createdAt), "MMM dd")}
-                                </div>
-                                <div className="flex items-center gap-1 text-gray-500">
-                                  <User className="w-3 h-3" />
-                                  {history.createdBy}
-                                </div>
-                              </div>
-                            </Tooltip>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>*/}
-
-
 <thead>
   <tr className="border-b bg-gray-50">
     <th className="text-left p-3 font-medium text-gray-700">Menu ID</th>
@@ -846,11 +783,11 @@ const openPriceHistoryDialog = (item) => {
   })}
 </tbody>
                 </table>
-              </div>
+              
             </div>
           )}
         </div>
-      </div>
+     
 
       {/* Filters Section */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
