@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import Pcanteen.Backend.dto.DayOfWeek; // ✅ This is your custom enum
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/menu")
@@ -68,9 +69,31 @@ public class MenuController {
                 name, category, startDate, endDate, activeOnly));
     }
 
-    @GetMapping("/items/price-history")
+  /*  @GetMapping("/items/price-history")
     public ResponseEntity<List<PriceHistoryDTO>> getPriceHistory(@RequestParam String name) {
         return ResponseEntity.ok(menuItemService.getPriceHistory(name));
+    }*/
+    
+ // MenuController.java
+    @GetMapping("/items/price-history")
+    public ResponseEntity<List<PriceHistoryDTO>> getPriceHistory(
+            @RequestParam String name,
+            @RequestParam(required = false) String category) {
+        return ResponseEntity.ok(menuItemService.getPriceHistory(name, category));
+    }
+    
+    @PatchMapping("/items/{id}/availability")
+    public ResponseEntity<MenuItemDTO> updateAvailability(
+        @PathVariable Long id,
+        @RequestBody Map<String, Boolean> request,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        Boolean availableStatus = request.get("availableStatus");
+        if (availableStatus == null) {
+            throw new IllegalArgumentException("availableStatus must be provided");
+        }
+        MenuItemDTO updatedItem = menuItemService.updateAvailability(id, availableStatus, userDetails.getUsername());
+        return ResponseEntity.ok(updatedItem);
     }
 
     @DeleteMapping("/items/{id}")

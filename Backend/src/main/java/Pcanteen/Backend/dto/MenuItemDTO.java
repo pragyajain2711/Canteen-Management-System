@@ -22,7 +22,10 @@ public class MenuItemDTO {
     private String createdBy;
     private LocalDateTime updatedAt;
     private String updatedBy;
+    private Boolean availableStatus;
+
 	public Long getId() {
+		
 		return id;
 	}
 	public void setId(Long id) {
@@ -116,7 +119,7 @@ public class MenuItemDTO {
 		super();
 		// TODO Auto-generated constructor stub
 	}
-	public MenuItemDTO(Long id, String menuId, String name, String description, Double quantity, String unit,
+	/*public MenuItemDTO(Long id, String menuId, String name, String description, Double quantity, String unit,
 			Double price, LocalDateTime startDate, LocalDateTime endDate, String category, Boolean isActive,
 			LocalDateTime createdAt, String createdBy, LocalDateTime updatedAt, String updatedBy) {
 		super();
@@ -135,7 +138,7 @@ public class MenuItemDTO {
 		this.createdBy = createdBy;
 		this.updatedAt = updatedAt;
 		this.updatedBy = updatedBy;
-	}
+	}*/
 	@Override
 	public String toString() {
 		return "MenuItemDTO [id=" + id + ", menuId=" + menuId + ", name=" + name + ", description=" + description
@@ -144,6 +147,37 @@ public class MenuItemDTO {
 				+ createdAt + ", createdBy=" + createdBy + ", updatedAt=" + updatedAt + ", updatedBy=" + updatedBy
 				+ "]";
 	}
+	public Boolean getAvailableStatus() {
+		return availableStatus;
+	}
+	public void setAvailableStatus(Boolean availableStatus) {
+		this.availableStatus = availableStatus;
+	}
+	public MenuItemDTO(Long id, String menuId, String name, String description, Double quantity, String unit,
+			Double price, LocalDateTime startDate, LocalDateTime endDate, String category, Boolean isActive,
+			LocalDateTime createdAt, String createdBy, LocalDateTime updatedAt, String updatedBy,
+			Boolean availableStatus) {
+		super();
+		this.id = id;
+		this.menuId = menuId;
+		this.name = name;
+		this.description = description;
+		this.quantity = quantity;
+		this.unit = unit;
+		this.price = price;
+		this.startDate = startDate;
+		this.endDate = endDate;
+		this.category = category;
+		this.isActive = isActive;
+		this.createdAt = createdAt;
+		this.createdBy = createdBy;
+		this.updatedAt = updatedAt;
+		this.updatedBy = updatedBy;
+		this.availableStatus = availableStatus;
+	}
     
     
 }
+
+
+

@@ -24,8 +24,14 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
                                                  @Param("date") LocalDateTime date);
     
     // Find price history for a specific menu item (by name)
-    @Query("SELECT m FROM MenuItem m WHERE m.name = :name ORDER BY m.startDate DESC")
-    List<MenuItem> findPriceHistoryByName(@Param("name") String name);
+    /*@Query("SELECT m FROM MenuItem m WHERE m.name = :name ORDER BY m.startDate DESC")
+    List<MenuItem> findPriceHistoryByName(@Param("name") String name);*/
+    
+ // Modify the existing query to include category filter
+ // MenuItemRepository.java
+    @Query("SELECT m FROM MenuItem m WHERE m.name = :name AND (:category IS NULL OR m.category = :category) ORDER BY m.createdAt DESC")
+    List<MenuItem> findPriceHistoryByNameAndCategory(@Param("name") String name, 
+                                                   @Param("category") String category);
     
     // Find items with filters
     @Query("SELECT m FROM MenuItem m WHERE " +
@@ -42,5 +48,7 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
                                   @Param("activeOnly") Boolean activeOnly);
     
     Optional<MenuItem> findByMenuId(String menuId);
+    List<MenuItem> findByNameOrderByCreatedAtDesc(String name);
+
     
 }

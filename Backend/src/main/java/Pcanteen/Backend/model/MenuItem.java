@@ -58,8 +58,20 @@ public class MenuItem {
 
     @Column(name = "updated_by")
     private String updatedBy;
+    
+    @Column(name = "available_status", nullable = false)
+    private Boolean availableStatus = true;
+    
 
-    // Pre-persist and pre-update hooks to set menuId and isActive
+    public Boolean getAvailableStatus() {
+		return availableStatus;
+	}
+
+	public void setAvailableStatus(Boolean availableStatus) {
+		this.availableStatus = availableStatus;
+	}
+
+	// Pre-persist and pre-update hooks to set menuId and isActive
     @PrePersist
     @PreUpdate
     public void prepare() {
@@ -193,7 +205,7 @@ public class MenuItem {
 		this.updatedBy = updatedBy;
 	}
 
-	public MenuItem(Long id, String menuId, String name, String description, Double quantity, String unit, Double price,
+	/*public MenuItem(Long id, String menuId, String name, String description, Double quantity, String unit, Double price,
 			LocalDateTime startDate, LocalDateTime endDate, String category, Boolean isActive, LocalDateTime createdAt,
 			String createdBy, LocalDateTime updatedAt, String updatedBy) {
 		super();
@@ -212,20 +224,42 @@ public class MenuItem {
 		this.createdBy = createdBy;
 		this.updatedAt = updatedAt;
 		this.updatedBy = updatedBy;
-	}
+	}*/
 
 	public MenuItem() {
 		super();
 		// TODO Auto-generated constructor stub
 	}
 
-	@Override
+	public MenuItem(Long id, String menuId, String name, String description, Double quantity, String unit, Double price,
+			LocalDateTime startDate, LocalDateTime endDate, String category, Boolean isActive, LocalDateTime createdAt,
+			String createdBy, LocalDateTime updatedAt, String updatedBy, Boolean availableStatus) {
+		super();
+		this.id = id;
+		this.menuId = menuId;
+		this.name = name;
+		this.description = description;
+		this.quantity = quantity;
+		this.unit = unit;
+		this.price = price;
+		this.startDate = startDate;
+		this.endDate = endDate;
+		this.category = category;
+		this.isActive = isActive;
+		this.createdAt = createdAt;
+		this.createdBy = createdBy;
+		this.updatedAt = updatedAt;
+		this.updatedBy = updatedBy;
+		this.availableStatus = availableStatus;
+	}
+
+	/*@Override
 	public String toString() {
 		return "MenuItem [id=" + id + ", menuId=" + menuId + ", name=" + name + ", description=" + description
 				+ ", quantity=" + quantity + ", unit=" + unit + ", price=" + price + ", startDate=" + startDate
 				+ ", endDate=" + endDate + ", category=" + category + ", isActive=" + isActive + ", createdAt="
 				+ createdAt + ", createdBy=" + createdBy + ", updatedAt=" + updatedAt + ", updatedBy=" + updatedBy
 				+ "]";
-	}
+	}*/
     
 }

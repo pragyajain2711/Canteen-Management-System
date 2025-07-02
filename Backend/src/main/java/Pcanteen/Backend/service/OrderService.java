@@ -210,9 +210,9 @@ public class OrderService {
         return order.getMenuItem();
     }
     
-    public List<PriceHistoryDTO> getOrderPriceHistory(Long orderId) {
+   /* public List<PriceHistoryDTO> getOrderPriceHistory(Long orderId) {
         Order order = getOrderWithDetails(orderId);
         return menuItemService.getPriceHistory(order.getMenuItem().getName());
-    }
+    }*/
     
 }
