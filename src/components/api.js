@@ -102,6 +102,20 @@ export const weeklyMenuApi = {
   getByDateRange: (startDate, endDate) => 
     api.get('api/menu/weekly/range', { params: { startDate, endDate } }),
   delete: (id) => api.delete(`api/menu/weekly/${id}`),
+  copyFromPreviousWeek: (currentWeekStart) =>
+  api.post('api/menu/weekly/copy-previous', null, {
+    params: { currentWeekStart: currentWeekStart.split("T")[0] }  // send only the date part
+  }),
+  /*clearWeek: (startDate, endDate) =>
+  api.delete('api/menu/weekly/clear', {
+    params: {
+      startDate: startDate.split("T")[0],
+      endDate: endDate.split("T")[0]
+    }
+  }),*/
+
+
+
 };
 
 /*api.interceptors.request.use(config => {

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState ,useEffect} from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Plus,
@@ -76,6 +76,7 @@ export default  function WeeklyMenuManagement() {
   const [viewMode, setViewMode] = useState("double")
   const [currentDayIndex, setCurrentDayIndex] = useState(0)
   const [selectedMealFilter, setSelectedMealFilter] = useState("all")
+  const [weekCopied, setWeekCopied] = useState(false)
 
   const weekStart = startOfWeek(selectedWeek, { weekStartsOn: 1 })
   const weekEnd = endOfWeek(selectedWeek, { weekStartsOn: 1 })
@@ -90,6 +91,50 @@ export default  function WeeklyMenuManagement() {
 
   const filteredMenuItems =
     selectedMealFilter === "all" ? weeklyMenus : weeklyMenus.filter((item) => item.mealCategory === selectedMealFilter)
+
+
+
+ useEffect(() => {
+  let cancelled = false;
+
+  const checkAndCopyWeek = async () => {
+    try {
+      const currentWeekItems = await weeklyMenuApi.getByDateRange(
+        weekStart.toISOString(),
+        weekEnd.toISOString()
+      );
+
+      if (!cancelled && currentWeekItems.data.length === 0) {
+        // Double-check if this week is already copied (to prevent loops)
+        const previousWeekStart = new Date(weekStart);
+        previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+
+        const previousItems = await weeklyMenuApi.getByDateRange(
+          previousWeekStart.toISOString(),
+          new Date(previousWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString()
+        );
+
+        if (previousItems.data.length > 0) {
+          await weeklyMenuApi.copyFromPreviousWeek(weekStart.toISOString().split("T")[0]);
+          await queryClient.invalidateQueries({
+            queryKey: ["weeklyMenus", weekStart.toISOString(), weekEnd.toISOString()],
+          });
+
+          setWeekCopied(true);
+          setTimeout(() => setWeekCopied(false), 3000);
+        }
+      }
+    } catch (error) {
+      if (!cancelled) console.error("Error checking/copying week:", error);
+    }
+  };
+
+  checkAndCopyWeek();
+
+  return () => {
+    cancelled = true; // Cancel pending effect if component re-renders
+  };
+}, [weekStart.toISOString(), weekEnd.toISOString()]);
 
   
 
@@ -144,6 +189,20 @@ export default  function WeeklyMenuManagement() {
   const handleDeleteWeeklyMenuItem = async (id) => {
     await deleteMutation.mutateAsync(id)
   }
+
+ /*const handleClearWeek = async () => {
+    if (window.confirm("Are you sure you want to clear all menu items for this week?")) {
+      try {
+        await weeklyMenuApi.clearWeek(
+          weekStart.toISOString(),
+          weekEnd.toISOString()
+        )
+        queryClient.invalidateQueries({ queryKey: ["weeklyMenus"] })
+      } catch (error) {
+        console.error("Error clearing week:", error)
+      }
+    }
+  }*/
 
   const resetAddForm = () => {
     setSelectedDay("")
@@ -222,6 +281,11 @@ export default  function WeeklyMenuManagement() {
             <h1 className="text-3xl font-bold text-gray-900">Weekly Menu Planning</h1>
             <p className="text-gray-600 mt-1">
               Week of {format(weekStart, "MMM dd")} - {format(weekEnd, "MMM dd, yyyy")}
+              {weekCopied && (
+                <span className="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+                  Copied from previous week
+                </span>
+              )}
             </p>
           </div>
 
@@ -250,6 +314,16 @@ export default  function WeeklyMenuManagement() {
                 </div>
               )}
             </div>
+
+
+ {/* Clear Week Button */}
+       {/*}     <button
+              onClick={handleClearWeek}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear Week
+            </button>*/}
 
             {/* Add Menu Item Button */}
             <button
@@ -618,7 +692,7 @@ export default  function WeeklyMenuManagement() {
   value={selectedMenuItem?.menuId || ""}
   onChange={(e) => {
     const id = e.target.value;
-    const item = availableMenuItems.find(i => i.menuId == id);
+    const item = availableMenuItems.find(i => i.menuId === id);
     setSelectedMenuItem(item);
   }}
 >

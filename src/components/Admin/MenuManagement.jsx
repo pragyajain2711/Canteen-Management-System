@@ -518,7 +518,7 @@ const {
   const category = categories.find(cat => cat.value === categoryValue) || categories[0];
   return `${category.color} ${category.iconColor}`;
 };
-  const handleUpdateItem = async () => {
+ /* const handleUpdateItem = async () => {
     if (!selectedItem) return
 
     const priceChanged = formData.price !== originalPrice
@@ -532,7 +532,36 @@ const {
       id: selectedItem.id,
       data: updateData,
     })
-  }
+  }*/
+
+const handleUpdateItem = async () => {
+  if (!selectedItem) return;
+
+  const priceChanged = formData.price !== originalPrice;
+
+  const updateData = {
+  name: formData.name,
+  description: formData.description,
+  category: selectedItem.category, // the one being edited
+  categories: [selectedItem.category], // satisfy backend validation
+  unit: formData.unit,
+  quantity: formData.quantity,
+  price: formData.price,
+  startDate: priceChanged ? new Date().toISOString() : formData.startDate.toISOString(),
+  endDate: formData.endDate.toISOString(),
+  availableStatus: formData.availableStatus,
+};
+
+
+  await menuApi.updateItem(selectedItem.id, updateData);
+
+  queryClient.invalidateQueries(["menuItems"]);
+  setIsEditDialogOpen(false);
+  resetForm();
+};
+
+
+
 
   const resetForm = () => {
     setFormData({
@@ -550,7 +579,7 @@ const {
     setOriginalPrice(0)
   }
 
-  const openEditDialog = (item) => {
+ /* const openEditDialog = (item) => {
     setSelectedItem(item)
     setOriginalPrice(item.price)
     setFormData({
@@ -565,7 +594,35 @@ const {
       availableStatus: item.availableStatus,
     })
     setIsEditDialogOpen(true)
-  }
+  }*/
+
+    const openEditDialog = (item) => {
+  const matchedItems = menuItems.filter(i => i.name === item.name);
+
+  const categoriesWithStatus = matchedItems.map(i => ({
+    value: i.category,
+    isActive: isItemActive(i.startDate, i.endDate),
+  }));
+
+  setSelectedItem(item);
+  setOriginalPrice(item.price);
+
+  setFormData({
+    name: item.name,
+    description: item.description,
+    quantity: item.quantity,
+    unit: item.unit,
+    price: item.price,
+    startDate: new Date(item.startDate),
+    endDate: new Date(item.endDate),
+    categories: categoriesWithStatus.map(c => c.value),
+    availableStatus: item.availableStatus,
+    existingCategoryStates: categoriesWithStatus,
+  });
+
+  setIsEditDialogOpen(true);
+};
+
 
 /*const openPriceHistoryDialog = (item) => {
   setSelectedItem(item)
@@ -879,6 +936,7 @@ const openPriceHistoryDialog = (item) => {
                 <th className="font-semibold p-4 text-left text-gray-700">Status</th>
                 <th className="font-semibold p-4 text-left text-gray-700">Available</th>
                 <th className="font-semibold p-4 text-left text-gray-700">Created</th>
+                <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Updated</th>
                 <th className="font-semibold p-4 text-left text-gray-700">Actions</th>
               </tr>
             </thead>
@@ -1023,6 +1081,27 @@ const openPriceHistoryDialog = (item) => {
                           </Tooltip>
                         </div>
                       </td>
+                      <td className="p-4">
+  <div className="text-xs">
+    {item.updatedAt && item.updatedAt !== item.createdAt ? (
+      <Tooltip content={`Updated on ${formatFullDateTime(item.updatedAt)} by ${item.updatedBy || "Unknown"}`}>
+        <div className="cursor-help">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3 text-blue-500" />
+            {format(new Date(item.updatedAt), "MMM dd")}
+          </div>
+          <div className="flex items-center gap-1 text-gray-500">
+            <User className="w-3 h-3" />
+            {item.updatedBy || "—"}
+          </div>
+        </div>
+      </Tooltip>
+    ) : (
+      <div className="text-gray-400 text-xs italic">--</div>
+    )}
+  </div>
+</td>
+
                       <td className="p-4">
                         <div className="flex items-center gap-1">
                           <Tooltip content="View Price History">
@@ -1405,30 +1484,76 @@ const openPriceHistoryDialog = (item) => {
                 />
               </div>
 
-              <div className="space-y-2">
+              {/*<div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Categories</label>
                 <div className="grid grid-cols-2 gap-2">
                   {categories.map((category) => (
-                    <div key={category.value} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`edit-category-${category.value}`}
-                        checked={formData.categories?.includes(category.value) || false}
-                        onChange={(e) => {
-                          const newCategories = e.target.checked
-                            ? [...(formData.categories || []), category.value]
-                            : (formData.categories || []).filter(c => c !== category.value);
-                          setFormData({...formData, categories: newCategories});
-                        }}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <label htmlFor={`edit-category-${category.value}`} className="ml-2 text-sm text-gray-700">
-                        {category.label}
-                      </label>
-                    </div>
-                  ))}
+  <div key={category.value} className="flex items-center">
+    <input
+      type="checkbox"
+      id={`edit-category-${category.value}`}
+      checked={formData.categories?.includes(category.value) || false}
+      onChange={(e) => {
+        const newCategories = e.target.checked
+          ? [...(formData.categories || []), category.value]
+          : (formData.categories || []).filter(c => c !== category.value);
+        setFormData({...formData, categories: newCategories});
+      }}
+      className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
+        formData.existingCategoryStates?.some(c => c.value === category.value) ? "opacity-50" : ""
+      }`}
+    />
+    <label htmlFor={`edit-category-${category.value}`} className="ml-2 text-sm text-gray-700 flex items-center gap-1">
+      {category.label}
+      {formData.existingCategoryStates?.some(c => c.value === category.value) && (
+        <span className="text-xs ml-1 rounded-full px-2 py-0.5 border border-gray-300 bg-gray-100 text-gray-600">
+          {formData.existingCategoryStates.find(c => c.value === category.value)?.isActive ? "Active" : "Inactive"}
+        </span>
+      )}
+    </label>
+  </div>
+))}
+
                 </div>
-              </div>
+              </div>*/}
+
+
+              <div className="space-y-2">
+  <label className="block text-sm font-medium text-gray-700">Category</label>
+  <p className="text-sm font-semibold text-black">{selectedItem.category}</p>
+
+  {formData.existingCategoryStates?.filter(c => c.value !== selectedItem.category).length > 0 && (
+    <div className="mt-2">
+      <p className="text-sm text-gray-500">Also available in:</p>
+      <ul className="ml-4 mt-1 space-y-1">
+        {formData.existingCategoryStates
+          .filter(c => c.value !== selectedItem.category)
+          .map(c => (
+            <li
+              key={c.value}
+              className="text-xs text-gray-500 flex items-center gap-2 group"
+              title={`Also exists in ${c.value}`}
+            >
+              <span className="italic">{c.value}</span>
+              <span
+                className={`rounded px-2 py-0.5 text-[10px] ${
+                  c.isActive
+                    ? 'bg-green-100 text-green-600 border border-green-300'
+                    : 'bg-gray-200 text-gray-500 border border-gray-300'
+                }`}
+              >
+                {c.isActive ? 'Active' : 'Inactive'}
+              </span>
+              <span className="text-gray-300 group-hover:text-red-400 text-xs cursor-not-allowed">
+                ✕
+              </span>
+            </li>
+          ))}
+      </ul>
+    </div>
+  )}
+</div>
+
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Valid From</label>

@@ -85,14 +85,22 @@ export default function AdminOrderHistory() {
   })
 
   // Fetch price history - keeping your existing API call
-  const fetchPriceHistory = async (orderId) => {
-    try {
-      const { data } = await orderApi.getOrderPriceHistory(orderId)
-      setPriceHistory(data)
-    } catch (err) {
-      console.error("Failed to fetch price history:", err)
-    }
+const fetchPriceHistory = async (orderId) => {
+  try {
+    const { data } = await orderApi.getOrderPriceHistory(orderId);
+    // Transform the data if needed
+    const transformedData = data.map(item => ({
+      ...item,
+      price: item.price || item.currentPrice, // fallback to currentPrice if price not available
+      startDate: item.startDate || item.createdAt, // fallback to createdAt if startDate not available
+      isActive: item.isActive || item.wasActive // handle different field names
+    }));
+    setPriceHistory(transformedData);
+  } catch (err) {
+    console.error("Failed to fetch price history:", err);
+    setPriceHistory([]); // Set empty array on error
   }
+};
 
   const normalizedOrders =
     rawOrders?.map((order) => ({
@@ -172,7 +180,35 @@ export default function AdminOrderHistory() {
     a.click()
     window.URL.revokeObjectURL(url)
   }
+const formatDateTime = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-IN', { 
+    day: '2-digit', 
+    month: 'short', 
+    year: 'numeric' 
+  });
+};
 
+const formatFullDateTime = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleString('en-IN', { 
+    day: '2-digit', 
+    month: 'short', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const getCategoryStyle = (category) => {
+  switch(category) {
+    case 'breakfast': return 'bg-orange-100 text-orange-800';
+    case 'lunch': return 'bg-green-100 text-green-800';
+    case 'snacks': return 'bg-purple-100 text-purple-800';
+    case 'beverages': return 'bg-blue-100 text-blue-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
   const totalAmount = filteredOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0)
   const statusCounts = filteredOrders.reduce((acc, order) => {
     acc[order.status] = (acc[order.status] || 0) + 1
@@ -640,7 +676,7 @@ export default function AdminOrderHistory() {
                 </div>
               </div>
 
-              {/* Price History */}
+              {/* Price History *
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <IndianRupee className="mr-2" size={18} /> Price History
@@ -666,7 +702,99 @@ export default function AdminOrderHistory() {
                     )}
                   </div>
                 )}
-              </div>
+              </div>*/}
+
+{/* Price History */}
+<div className="space-y-4">
+  <h3 className="font-medium text-gray-700 flex items-center">
+    <IndianRupee className="mr-2" size={18} /> Price History
+  </h3>
+  <button
+    onClick={() => fetchPriceHistory(selectedOrder.id)}
+    className="bg-blue-50 text-blue-600 px-3 py-1 rounded text-sm flex items-center"
+  >
+    {priceHistory ? "Refresh History" : "Load Price History"}
+    <ChevronDown size={16} className="ml-1" />
+  </button>
+  
+  {priceHistory && (
+    <div className="mt-2 border rounded-lg overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr className="border-b bg-gray-50">
+              <th className="font-semibold p-3 text-left">Price</th>
+              <th className="text-left p-3 font-medium text-gray-700">Category</th>
+              <th className="font-semibold p-3 text-left">Valid From</th>
+              <th className="font-semibold p-3 text-left">Valid Until</th>
+              <th className="font-semibold p-3 text-left">Status</th>
+              <th className="font-semibold p-3 text-left">Created By</th>
+              <th className="font-semibold p-3 text-left">Created At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {priceHistory.length > 0 ? (
+              priceHistory.map((history, index) => (
+                <tr key={`${history.price}-${history.startDate}`} className="hover:bg-gray-50 border-b">
+                  <td className="p-3">
+                    <span className="font-semibold text-green-700">₹{history.price?.toFixed(2)}</span>
+                  </td>
+                  <td className="p-3">
+                    <span className={`badge ${getCategoryStyle(history.category)} px-2 py-1 rounded-full text-xs`}>
+                      {history.category}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2 cursor-help">
+                      <Clock className="w-4 h-4 text-gray-500" />
+                      {formatDateTime(history.startDate)}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2 cursor-help">
+                      <Clock className="w-4 h-4 text-gray-500" />
+                      {history.endDate ? formatDateTime(history.endDate) : 'Present'}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                        history.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full ${history.isActive ? "bg-green-500" : "bg-red-500"}`}
+                      />
+                      {history.isActive ? "Active" : "Expired"}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-blue-600" />
+                      <span className="text-blue-700 font-medium">{history.createdBy || "System"}</span>
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <div className="text-sm text-gray-600 cursor-help">
+                      {formatDateTime(history.createdAt)}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="7" className="p-4 text-center text-gray-500">
+                  No price history available
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+</div>
+
             </div>
           </div>
         </div>
