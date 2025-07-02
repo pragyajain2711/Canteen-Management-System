@@ -288,6 +288,8 @@ export default function MenuManagement() {
   const [priceHistorySearch, setPriceHistorySearch] = useState("")
   const [priceHistoryDateRange, setPriceHistoryDateRange] = useState({ from: undefined, to: undefined })
   const [originalPrice, setOriginalPrice] = useState(0)
+const [priceHistoryCategory, setPriceHistoryCategory] = useState("");
+//const [isSearchingPriceHistory, setIsSearchingPriceHistory] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -385,7 +387,7 @@ export default function MenuManagement() {
 */
 
 // Replace the price history query with this simplified version
-const { data: priceHistoryResults = [], isLoading: isSearchingPriceHistory } = useQuery({
+{/*const { data: priceHistoryResults = [], isLoading: isSearchingPriceHistory } = useQuery({
     queryKey: ["priceHistory", priceHistorySearch, priceHistoryDateRange],
     queryFn: async () => {
         if (!priceHistorySearch) return [];
@@ -421,7 +423,51 @@ const { data: priceHistoryResults = [], isLoading: isSearchingPriceHistory } = u
     },
     enabled: !!priceHistorySearch,
 });
+*/}
 
+
+// In the price history query section:
+const { 
+  data: priceHistoryResults = [], 
+  isLoading: isSearchingPriceHistory,
+  error: priceHistoryError 
+} = useQuery({
+  queryKey: ["priceHistory", priceHistorySearch, priceHistoryCategory, priceHistoryDateRange],
+  queryFn: async () => {
+    if (!priceHistorySearch) return [];
+    const response = await menuApi.getPriceHistory(
+      priceHistorySearch, 
+      priceHistoryCategory,
+      priceHistoryDateRange
+    );
+    return response.data.map(item => ({
+      ...item,
+      isActive: isItemActive(item.startDate, item.endDate)
+    }));
+  },
+  enabled: !!priceHistorySearch,
+});
+
+/*const { 
+  data: priceHistoryResults = [], 
+  isLoading: isSearchingPriceHistory,
+  error: priceHistoryError 
+} = useQuery({
+  queryKey: ["priceHistory", priceHistorySearch, priceHistoryCategory, priceHistoryDateRange],
+  queryFn: async () => {
+    if (!priceHistorySearch || !priceHistoryCategory) return [];
+    const response = await menuApi.getPriceHistory(
+      priceHistorySearch, 
+      priceHistoryCategory,
+      {
+        startDate: priceHistoryDateRange.from?.toISOString(),
+        endDate: priceHistoryDateRange.to?.toISOString()
+      }
+    );
+    return response.data;
+  },
+  enabled: !!priceHistorySearch && !!priceHistoryCategory,
+});*/
   const filteredItems = menuItems.filter((item) => {
     const matchesSearch = searchTerm === "" ||
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -469,6 +515,10 @@ const { data: priceHistoryResults = [], isLoading: isSearchingPriceHistory } = u
     })
   }
 
+  const getCategoryStyle = (categoryValue) => {
+  const category = categories.find(cat => cat.value === categoryValue) || categories[0];
+  return `${category.color} ${category.iconColor}`;
+};
   const handleUpdateItem = async () => {
     if (!selectedItem) return
 
@@ -518,10 +568,17 @@ const { data: priceHistoryResults = [], isLoading: isSearchingPriceHistory } = u
     setIsEditDialogOpen(true)
   }
 
-const openPriceHistoryDialog = (item) => {
+/*const openPriceHistoryDialog = (item) => {
   setSelectedItem(item)
   setPriceHistorySearch(item.name)
   setIsPriceHistoryDialogOpen(true)
+}*/
+
+const openPriceHistoryDialog = (item) => {
+  setSelectedItem(item);
+  setPriceHistorySearch(item.name);
+  setPriceHistoryCategory(item.category); // Add this state
+  setIsPriceHistoryDialogOpen(true);
 }
 
   const formatDateTime = (dateString) => {
@@ -627,7 +684,7 @@ const openPriceHistoryDialog = (item) => {
               </h4>
               <div className="overflow-x-auto">
                 <table className="w-full bg-white rounded-lg">
-                  <thead>
+                  {/*<thead>
                     <tr className="border-b bg-gray-50">
                       <th className="text-left p-3 font-medium text-gray-700">Menu ID</th>
                       <th className="text-left p-3 font-medium text-gray-700">Price</th>
@@ -704,7 +761,90 @@ const openPriceHistoryDialog = (item) => {
                         </tr>
                       )
                     })}
-                  </tbody>
+                  </tbody>*/}
+
+
+<thead>
+  <tr className="border-b bg-gray-50">
+    <th className="text-left p-3 font-medium text-gray-700">Menu ID</th>
+    <th className="text-left p-3 font-medium text-gray-700">Name</th>
+    <th className="text-left p-3 font-medium text-gray-700">Price</th>
+    <th className="text-left p-3 font-medium text-gray-700">Category</th>
+    <th className="text-left p-3 font-medium text-gray-700">Valid Period</th>
+    <th className="text-left p-3 font-medium text-gray-700">Status</th>
+    <th className="text-left p-3 font-medium text-gray-700">Availability</th>
+    <th className="text-left p-3 font-medium text-gray-700">Created</th>
+  </tr>
+</thead>
+<tbody>
+  {priceHistoryResults.map((history) => {
+    const categoryData = getCategoryData(history.category);
+    const CategoryIcon = categoryData.icon;
+    
+    return (
+      <tr key={`${history.menuId}-${history.startDate}`} className="hover:bg-gray-50 border-b">
+        <td className="p-3">
+          <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+            {history.menuId}
+          </span>
+        </td>
+        <td className="p-3 font-medium">{history.name}</td>
+        <td className="p-3">
+          <span className="font-semibold text-green-700">₹{history.price}</span>
+        </td>
+        <td className="p-3">
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${categoryData.color}`}>
+            <CategoryIcon className={`w-3 h-3 ${categoryData.iconColor}`} />
+            {categoryData.label}
+          </span>
+        </td>
+        <td className="p-3">
+          <Tooltip content={`${formatFullDateTime(history.startDate)} to ${formatFullDateTime(history.endDate)}`}>
+            <div className="text-xs cursor-help">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3 text-gray-500" />
+                <span className="whitespace-nowrap">
+                  {format(new Date(history.startDate), "MMM dd")} -{" "}
+                  {format(new Date(history.endDate), "MMM dd")}
+                </span>
+              </span>
+            </div>
+          </Tooltip>
+        </td>
+        <td className="p-3">
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+            history.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${history.isActive ? "bg-green-500" : "bg-red-500"}`} />
+            {history.isActive ? "Active" : "Expired"}
+          </span>
+        </td>
+        <td className="p-3">
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+            history.availableStatus ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${history.availableStatus ? "bg-green-500" : "bg-red-500"}`} />
+            {history.availableStatus ? "Available" : "Sold Out"}
+          </span>
+        </td>
+        <td className="p-3">
+          <Tooltip content={`Created on ${formatFullDateTime(history.createdAt)} by ${history.createdBy}`}>
+            <div className="text-xs cursor-help">
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3 text-gray-500" />
+                {format(new Date(history.createdAt), "MMM dd")}
+              </div>
+              <div className="flex items-center gap-1 text-gray-500">
+                <User className="w-3 h-3" />
+                {history.createdBy}
+              </div>
+            </div>
+          </Tooltip>
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
                 </table>
               </div>
             </div>
@@ -1499,6 +1639,7 @@ const openPriceHistoryDialog = (item) => {
 <thead>
     <tr className="border-b bg-gray-50">
         <th className="font-semibold p-3 text-left">Price</th>
+            <th className="text-left p-3 font-medium text-gray-700">Category</th>
         <th className="font-semibold p-3 text-left">Valid From</th>
         <th className="font-semibold p-3 text-left">Valid Until</th>
         <th className="font-semibold p-3 text-left">Status</th>
@@ -1508,10 +1649,15 @@ const openPriceHistoryDialog = (item) => {
 </thead>
 <tbody>
     {priceHistoryResults.map((history, index) => (
-        <tr key={`${history.price}-${index}`} className="hover:bg-gray-50 border-b">
+        <tr key={`${history.price}-${history.startDate}`} className="hover:bg-gray-50 border-b">
             <td className="p-3">
                 <span className="font-semibold text-green-700">₹{history.price}</span>
             </td>
+            <td>
+        <span className={`badge ${getCategoryStyle(history.category)}`}>
+          {history.category}
+        </span>
+      </td>
             <td className="p-3">
                 <Tooltip content={formatFullDateTime(history.startDate)}>
                     <div className="flex items-center gap-2 cursor-help">

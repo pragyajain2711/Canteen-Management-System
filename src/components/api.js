@@ -75,7 +75,16 @@ export const menuApi = {
   getItems: (params) => api.get('api/menu/items', { params }),
   getActiveItems: (date,category) => api.get('api/menu/items/active', { params: { date , category} }),
   getFilteredItems: (filters) => api.get('api/menu/items/filter', { params: filters }),
-  getPriceHistory: (name) => api.get('api/menu/items/price-history', { params: { name } }),
+ // getPriceHistory: (name) => api.get('api/menu/items/price-history', { params: { name } }),
+ // api.js
+getPriceHistory: (name, category, dateRange) => api.get('api/menu/items/price-history', { 
+  params: { 
+    name,
+    category,
+    startDate: dateRange?.from?.toISOString(),
+    endDate: dateRange?.to?.toISOString()
+  } 
+}),
   createItem: (data) => api.post('api/menu/items', data),
   updateItem: (id, data) => api.put(`api/menu/items/${id}`, data),
   deleteItem: (id) => api.delete(`api/menu/items/${id}`),
