@@ -1,217 +1,249 @@
-import { useState, useEffect } from "react";
-import { employeeMenuApi } from "./api";
-import api from "./api";
-import { useAuth } from './AuthContext';
-import { CheckCircle, Loader, Plus, X, ShoppingCart } from 'lucide-react';
+
+import { useState, useEffect } from "react"
+import { employeeMenuApi, menuApi } from "./api"
+import api from "./api"
+import { useAuth } from "./AuthContext"
+import {
+  CheckCircle,
+  Loader,
+  Plus,
+  X,
+  ShoppingCart,
+  Search,
+  Filter,
+  Calendar,
+  Minus,
+  Trash2,
+  Package,
+  ChefHat,
+  Coffee,
+  Utensils,
+  Cookie,
+  Wine,
+  AlertCircle,
+} from "lucide-react"
 
 export default function EmployeeMenu() {
-  // State for menu data and filtering
-  const [menuItems, setMenuItems] = useState([]);
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedDay, setSelectedDay] = useState("MONDAY");
-  const [searchQuery, setSearchQuery] = useState("");
+  const { employee, isAdmin } = useAuth()
+  
+  // State variables
+  const [menuItems, setMenuItems] = useState([])
+  const [filteredItems, setFilteredItems] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [selectedDay, setSelectedDay] = useState("WEDNESDAY")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchMode, setSearchMode] = useState(false)
   const [filters, setFilters] = useState({
     category: "all",
-    status: "active"
-  });
+    status: "active",
+  })
 
-  // State for ordering
-  const [orderingItem, setOrderingItem] = useState(null);
-  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
-  const [orderSuccessData, setOrderSuccessData] = useState(null);
+  // Order dialog state
+  const [showOrderDialog, setShowOrderDialog] = useState(false)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [orderQuantity, setOrderQuantity] = useState(1)
+  const [orderRemarks, setOrderRemarks] = useState("")
+  const [orderingItem, setOrderingItem] = useState(null)
+
+  // Cart state
+  const [cartItems, setCartItems] = useState([])
+  const [showCart, setShowCart] = useState(false)
+  const [cartLoading, setCartLoading] = useState(false)
+
+  // Success notification
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false)
+  const [orderSuccessData, setOrderSuccessData] = useState(null)
 
   // Admin ordering context
-  const { employee, isAdmin ,admin} = useAuth();
-  const [orderContext, setOrderContext] = useState('self');
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [orderContext, setOrderContext] = useState("self")
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
 
-  // Load menu items
+  const ALL_DAYS = [
+    { key: "MONDAY", label: "Mon", fullName: "Monday" },
+    { key: "TUESDAY", label: "Tue", fullName: "Tuesday" },
+    { key: "WEDNESDAY", label: "Wed", fullName: "Wednesday" },
+    { key: "THURSDAY", label: "Thu", fullName: "Thursday" },
+    { key: "FRIDAY", label: "Fri", fullName: "Friday" },
+    { key: "SATURDAY", label: "Sat", fullName: "Saturday" },
+    { key: "SUNDAY", label: "Sun", fullName: "Sunday" },
+  ]
+
+  const getCurrentDay = () => {
+    const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+    return days[new Date().getDay()]
+  }
+
+  const isCurrentDay = (day) => day === getCurrentDay()
+
+  const getCategoryIcon = (category) => {
+    switch (category?.toLowerCase()) {
+      case "breakfast": return <Coffee className="w-6 h-6 text-orange-600" />
+      case "lunch": return <Utensils className="w-6 h-6 text-green-600" />
+      case "thali": return <ChefHat className="w-6 h-6 text-purple-600" />
+      case "snacks": return <Cookie className="w-6 h-6 text-yellow-600" />
+      case "beverages": return <Wine className="w-6 h-6 text-blue-600" />
+      default: return <Package className="w-6 h-6 text-gray-600" />
+    }
+  }
+
   const loadMenuItems = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await employeeMenuApi.getWeeklyMenu(selectedDay, filters.category);
-      const items = response.data.map(item => item.menuItem);
-      setMenuItems(items);
-      setFilteredItems(items);
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load menu items");
-      console.error("API Error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setLoading(true)
+      setError(null)
+      setSearchMode(false)
 
-  // Handle search
+      const response = await employeeMenuApi.getWeeklyMenu(selectedDay, filters.category)
+      const items = response.data?.map(item => item.menuItem) || []
+      setMenuItems(items)
+      
+      // Group by category
+      const grouped = items.reduce((groups, item) => {
+        const category = item.category || 'Other'
+        if (!groups[category]) groups[category] = []
+        groups[category].push(item)
+        return groups
+      }, {})
+      
+      setFilteredItems(grouped)
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load menu items")
+      console.error("API Error:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      loadMenuItems();
-      return;
+      loadMenuItems()
+      return
     }
 
     try {
-      setLoading(true);
-      const response = await employeeMenuApi.searchItems(searchQuery);
-      const items = response.data.filter(item => filters.status === "all" || item.isActive);
-      setMenuItems(items);
-      setFilteredItems(items);
-    } catch (err) {
-      setError(err.response?.data?.message || "Search failed");
-      console.error("Search Error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setLoading(true)
+      setSearchMode(true)
+      
+      const response = await menuApi.getActiveItems()
+      
+      // Get unique items by name
+      const uniqueItems = response.data.reduce((acc, item) => {
+        if (!acc.some(i => i.name === item.name)) acc.push(item)
+        return acc
+      }, [])
 
-  // Filter items based on search and filters
-  useEffect(() => {
-    let filtered = menuItems;
-    
-    if (searchQuery) {
-      filtered = filtered.filter(item => 
+      // Filter by search and active status
+      const filtered = uniqueItems.filter(item => 
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  )}
+        (item.description?.toLowerCase().includes(searchQuery.toLowerCase()))
+      ).filter(item => item.isActive)
 
-    if (filters.status !== "all") {
-      filtered = filtered.filter(item => 
-        filters.status === "active" ? item.isActive : !item.isActive
-      );
+      // Group by category
+      const grouped = filtered.reduce((groups, item) => {
+        const category = item.category || 'Other'
+        if (!groups[category]) groups[category] = []
+        groups[category].push(item)
+        return groups
+      }, {})
+
+      setFilteredItems(grouped)
+    } catch (err) {
+      setError(err.response?.data?.message || "Search failed")
+      console.error("Search Error:", err)
+    } finally {
+      setLoading(false)
     }
+  }
 
-    setFilteredItems(filtered);
-  }, [menuItems, searchQuery, filters.status]);
-
-  // Load menu items when day or category changes
-  useEffect(() => {
-    loadMenuItems();
-  }, [selectedDay, filters.category]);
-
-  // Handle ordering an item
-  const handleOrderItem = async (item) => {
-    if (!item.isActive) return;
-    
+  const loadCartItems = async () => {
     try {
-      setOrderingItem(item.id);
-      
-      // Determine employee ID based on context
-   const employeeId =
-  isAdmin && orderContext === 'employee'
-    ? selectedEmployeeId
-    : employee?.employeeId || (isAdmin ? "admin_emp_id" : null);  // fallback
+      setCartLoading(true)
+      const employeeId = isAdmin && orderContext === "employee" 
+        ? selectedEmployeeId 
+        : employee?.employeeId
 
-
-      
       if (!employeeId) {
-        throw new Error("Employee ID not available");
+        setCartItems([])
+        return
       }
 
-      const response = await api.post('/api/orders', {
-        employeeId,
-        menuId: item.menuId,
-        quantity: 1,
-        expectedDeliveryDate: new Date().toISOString().split('T')[0],
-        remarks: isAdmin ? `Ordered by admin for ${orderContext === 'employee' ? 'employee ' + selectedEmployeeId : 'self'}` : ''
-      });
-      
-      setOrderSuccessData({
-        itemName: item.name,
-        orderId: response.data.id,
-        forEmployee: isAdmin && orderContext === 'employee' ? selectedEmployeeId : null
-      });
-      setShowOrderSuccess(true);
+      const response = await api.get(`/api/orders/pending/${employeeId}`)
+      setCartItems(response.data?.map(item => ({
+        ...item,
+        itemName: item.itemName || item.name || "Unknown Item",
+        priceAtOrder: Number(item.priceAtOrder || item.price || 0),
+        quantity: Number(item.quantity || 1),
+        totalPrice: Number(item.priceAtOrder || item.price || 0) * Number(item.quantity || 1),
+        status: item.status || "PENDING",
+        category: item.category || "general",
+      })) || [])
     } catch (err) {
-      alert(`Failed to place order: ${err.response?.data?.message || err.message}`);
+      console.error("Failed to load cart items:", err)
+      setCartItems([])
     } finally {
-      setOrderingItem(null);
+      setCartLoading(false)
     }
-  };
+  }
 
-  // Handle ordering a whole category
-  const handleOrderCategory = (category, items) => {
-    const activeItems = items.filter(item => item.isActive);
-    const totalPrice = activeItems.reduce((sum, item) => sum + item.price, 0);
-    console.log("Ordering category:", category, activeItems);
-    alert(`Ordering all ${category} items (${activeItems.length} items) - Total: ₹${totalPrice}`);
-  };
+  const handleConfirmOrder = async () => {
+    if (!selectedItem) return
 
-  // Get icon for category
-  const getCategoryIcon = (category) => {
-    switch (category.toLowerCase()) {
-      case "breakfast":
-        return (
-          <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-          </svg>
-        );
-      case "lunch":
-        return (
-          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-          </svg>
-        );
-      case "thali":
-        return (
-          <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-        );
-      case "snacks":
-        return (
-          <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-          </svg>
-        );
-      case "beverages":
-        return (
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        );
+    try {
+      setOrderingItem(selectedItem.id)
+      const employeeId = isAdmin && orderContext === "employee" 
+        ? selectedEmployeeId 
+        : employee?.employeeId
+
+      if (!employeeId) throw new Error("Employee ID not available")
+
+      const response = await api.post("/api/orders", {
+        employeeId,
+        menuId: selectedItem.menuId,
+        quantity: orderQuantity,
+        expectedDeliveryDate: new Date().toISOString().split("T")[0],
+        remarks: orderRemarks
+      })
+
+      setOrderSuccessData({
+        itemName: selectedItem.name,
+        orderId: response.data.id,
+        quantity: orderQuantity,
+        price: selectedItem.price,
+        totalPrice: selectedItem.price * orderQuantity,
+        forEmployee: isAdmin && orderContext === "employee" ? selectedEmployeeId : null,
+      })
+
+      setShowOrderSuccess(true)
+      setShowOrderDialog(false)
+      loadCartItems()
+    } catch (err) {
+      alert(`Failed to place order: ${err.response?.data?.message || err.message}`)
+    } finally {
+      setOrderingItem(null)
     }
-  };
+  }
 
-  // Get day name
-  const getDayName = (day) => {
-    const dayNames = {
-      MONDAY: "Monday",
-      TUESDAY: "Tuesday",
-      WEDNESDAY: "Wednesday",
-      THURSDAY: "Thursday",
-      FRIDAY: "Friday",
-    };
-    return dayNames[day] || day;
-  };
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return
+    try {
+      await api.delete(`/api/orders/${orderId}`)
+      loadCartItems()
+    } catch (err) {
+      alert(`Failed to cancel order: ${err.response?.data?.message || err.message}`)
+    }
+  }
 
-  // Group items by category
-  const groupedItems = filteredItems.reduce((groups, item) => {
-    const category = item.category;
-    if (!groups[category]) groups[category] = [];
-    groups[category].push(item);
-    return groups;
-  }, {});
+  useEffect(() => {
+    loadMenuItems()
+    loadCartItems()
+  }, [selectedDay, filters.category])
 
-  // Define category order
-  const categoryOrder = ["breakfast", "lunch", "thali", "snacks", "beverages"];
-  const sortedCategories = categoryOrder.filter((category) => groupedItems[category]?.length > 0);
-
-  // Days of the week
-  const DAYS = [
-    { key: "MONDAY", label: "Monday" },
-    { key: "TUESDAY", label: "Tuesday" },
-    { key: "WEDNESDAY", label: "Wednesday" },
-    { key: "THURSDAY", label: "Thursday" },
-    { key: "FRIDAY", label: "Friday" },
-  ];
+  useEffect(() => {
+    if (searchQuery.trim() === "" && searchMode) {
+      setSearchMode(false)
+      loadMenuItems()
+    }
+  }, [searchQuery])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -220,100 +252,110 @@ export default function EmployeeMenu() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <div className="bg-blue-100 p-3 rounded-lg mr-4">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+              <div className="bg-blue-500 p-4 rounded-xl mr-4 shadow-lg">
+                <ChefHat className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-blue-600">Menu Management</h1>
-                <p className="text-gray-600">Browse and order from our canteen menu</p>
+                <h1 className="text-4xl font-bold text-gray-800">Menu</h1>
+                <p className="text-gray-600 text-lg">Delicious meals, delivered fresh</p>
               </div>
             </div>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m0 0h8" />
-              </svg>
-              View Cart
+            
+            {/* Admin Controls */}
+            {isAdmin && (
+              <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={orderContext === "self"}
+                      onChange={() => setOrderContext("self")}
+                      className="mr-2 w-4 h-4 text-blue-500"
+                    />
+                    <span className="text-gray-700 font-medium text-sm">Order to me</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={orderContext === "employee"}
+                      onChange={() => {
+                        setOrderContext("employee")
+                        setSelectedEmployeeId("")
+                      }}
+                      className="mr-2 w-4 h-4 text-blue-500"
+                    />
+                    <span className="text-gray-700 font-medium text-sm">Order for others</span>
+                  </label>
+                </div>
+                {orderContext === "employee" && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      value={selectedEmployeeId}
+                      onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                      placeholder="Enter employee ID"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Cart Button */}
+            <button
+              onClick={() => setShowCart(true)}
+              className="relative bg-blue-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg hover:shadow-xl"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {cartItems.length > 0 ? (
+                <>
+                  {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
+                  <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                    {cartItems.length}
+                  </span>
+                </>
+              ) : (
+                "View Cart"
+              )}
             </button>
           </div>
         </div>
 
-        {/* Admin Controls */}
-        {isAdmin && (
-          <div className="mb-6 bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center space-x-4 mb-4">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={orderContext === 'self'}
-                  onChange={() => setOrderContext('self')}
-                  className="mr-2"
-                />
-                Order for myself
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={orderContext === 'employee'}
-                  onChange={() => {
-                    setOrderContext('employee');
-                    setSelectedEmployeeId('');
-                  }}
-                  className="mr-2"
-                />
-                Order for employee
-              </label>
-            </div>
-            
-            {orderContext === 'employee' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Employee ID
-                </label>
-                <input
-                  type="text"
-                  value={selectedEmployeeId}
-                  onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2"
-                  placeholder="Enter employee ID"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Search and Filters Bar */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        {/* Search and Filters */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search */}
+            {/* Search Input */}
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search Menu Items"
+                placeholder="Search menu items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("")
+                    setSearchMode(false)
+                    loadMenuItems()
+                  }}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {/* Category Filter */}
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-                </svg>
-              </div>
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <select
                 value={filters.category}
-                onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                className="block w-full pl-10 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md bg-white"
+                onChange={(e) => setFilters({...filters, category: e.target.value})}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white"
               >
                 <option value="all">All Categories</option>
                 <option value="breakfast">Breakfast</option>
@@ -326,193 +368,494 @@ export default function EmployeeMenu() {
 
             {/* Status Filter */}
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                  </svg>
-              </div>
+              <CheckCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <select
                 value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                className="block w-full pl-10 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md bg-white"
+                onChange={(e) => setFilters({...filters, status: e.target.value})}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white"
               >
-                <option value="active">Active Only</option>
-                <option value="all">All Status</option>
-                <option value="inactive">Inactive Only</option>
+                <option value="active">Available Only</option>
+                <option value="all">All Items</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Weekday Navigation Bar */}
-        <div className="mb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2">
-            <div className="flex gap-1">
-              {DAYS.map((day) => (
+        {/* Day Navigation */}
+        <div className="mb-6">
+          <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-2">
+            <div className="flex">
+              {ALL_DAYS.map((day) => (
                 <button
                   key={day.key}
                   onClick={() => setSelectedDay(day.key)}
-                  className={`flex-1 px-4 py-3 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
                     selectedDay === day.key
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                      ? "bg-blue-500 text-white shadow-lg"
+                      : "text-gray-700 hover:text-blue-500 hover:bg-blue-50"
                   }`}
                 >
-                  {day.label}
+                  <div className="flex items-center justify-center">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    {day.label}
+                  </div>
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Error State */}
+        {/* Current Day Notice */}
+        {!isCurrentDay(selectedDay) && (
+          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  <strong>View Only Mode:</strong> You can only place orders for today ({getCurrentDay()}).
+                  You're currently viewing the menu for {selectedDay}.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-red-800">{error}</span>
+              <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
+              <span className="text-red-800 font-medium">{error}</span>
             </div>
           </div>
         )}
 
         {/* Loading State */}
         {loading && (
-          <div className="flex items-center justify-center py-12">
-            <svg className="animate-spin h-8 w-8 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span className="text-gray-700">Loading menu items...</span>
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <Loader className="animate-spin h-12 w-12 text-blue-500 mx-auto mb-4" />
+              <span className="text-gray-700 text-lg">Loading delicious options...</span>
+            </div>
           </div>
         )}
 
-        {/* Menu Table */}
-        {!loading && !error && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            {filteredItems.length === 0 ? (
-              <div className="px-6 py-8 text-center text-gray-500">
-                <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                {searchQuery 
-                  ? `No items found for "${searchQuery}"`
-                  : `No menu items available for ${getDayName(selectedDay)}`}
-              </div>
-            ) : (
-              <div>
-                {sortedCategories.map((category) => (
-                  <div key={category} className="border-b border-gray-200 last:border-b-0">
-                    {/* Category Header */}
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          {getCategoryIcon(category)}
-                          <h3 className="ml-3 text-lg font-semibold text-gray-900 capitalize">{category}</h3>
-                          <span className="ml-2 text-sm text-gray-500">({groupedItems[category].length} items)</span>
-                        </div>
-                        <button
-                          onClick={() => handleOrderCategory(category, groupedItems[category])}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m0 0h8" />
-                          </svg>
-                          Order All
-                        </button>
-                      </div>
-                    </div>
+        {/* Search Results */}
+        {searchMode && !loading && (
+          <div className="bg-white rounded-xl shadow-lg mt-4 max-h-[70vh] overflow-y-auto">
+            {/* Search Header */}
+            <div className="sticky top-0 bg-white p-4 border-b z-10 flex justify-between items-center">
+              <h3 className="font-bold text-lg flex items-center">
+                <Search className="mr-2 w-5 h-5" />
+                Search Results for "{searchQuery}"
+              </h3>
+              <button 
+                onClick={() => {
+                  setSearchMode(false)
+                  setSearchQuery("")
+                  loadMenuItems()
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-                    {/* Category Items Table */}
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ITEM NAME</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QUANTITY</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PRICE</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {groupedItems[category].map((item) => (
-                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div>
-                                  <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                                  {item.description && <div className="text-sm text-gray-500">{item.description}</div>}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {item.quantity} {item.unit}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                ₹{item.price}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${item.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                                  {item.isActive ? "Active" : "Inactive"}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button
-                                  onClick={() => handleOrderItem(item)}
-                                  disabled={!item.isActive || orderingItem === item.id}
-                                  className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium transition-all transform ${
-                                    item.isActive
-                                      ? "bg-green-600 text-white hover:bg-green-700 hover:scale-105 shadow-lg hover:shadow-xl"
-                                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  }`}
-                                >
-                                  {orderingItem === item.id ? (
-                                    <svg className="animate-spin h-4 w-4 mr-1" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                  ) : (
-                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                  )}
-                                  {orderingItem === item.id ? 'Ordering...' : 'Order'}
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+            {/* Search Results Content */}
+            {Object.keys(filteredItems).length > 0 ? (
+              Object.entries(filteredItems).map(([category, items]) => (
+                <div key={category} className="p-4 border-b last:border-b-0">
+                  <div className="flex items-center mb-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center mr-3">
+                      {getCategoryIcon(category)}
                     </div>
+                    <h3 className="text-lg font-bold text-gray-800 capitalize">{category}</h3>
+                    <span className="ml-auto bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">
+                      {items.length} {items.length === 1 ? 'item' : 'items'}
+                    </span>
                   </div>
-                ))}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {items.map(item => (
+                      <div 
+                        key={item.id} 
+                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
+                      >
+                        <div className="flex">
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg mr-4">
+                            {getCategoryIcon(item.category)}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-bold text-gray-900">{item.name}</h4>
+                            <p className="text-sm text-gray-500 line-clamp-2 mt-1">
+                              {item.description || "No description available"}
+                            </p>
+                            <div className="mt-3 flex items-center justify-between">
+                              <span className="font-bold text-blue-600">₹{item.price}</span>
+                              <button
+                                onClick={() => {
+                                  setSelectedItem(item)
+                                  setOrderQuantity(1)
+                                  setOrderRemarks("")
+                                  setShowOrderDialog(true)
+                                }}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm transition-colors"
+                              >
+                                Add to Cart
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-8 text-center">
+                <Search className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                <h4 className="text-lg font-medium text-gray-900">No items found</h4>
+                <p className="text-gray-500">Try a different search term</p>
               </div>
             )}
           </div>
         )}
 
-        {/* Order Success Modal */}
-        {showOrderSuccess && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-sm">
-              <div className="text-center">
-                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-bold mb-2">Order Placed Successfully!</h3>
-                <p className="mb-4">
-                  Your order for {orderSuccessData.itemName} has been placed.
-                  <br />
-                  Order ID: #{orderSuccessData.orderId}
-                  {isAdmin && orderSuccessData.forEmployee && (
-                    <span className="block text-sm text-gray-600 mt-2">
-                      Ordered for employee: {orderSuccessData.forEmployee}
+        {/* Weekly Menu Display (when not in search mode) */}
+        {!searchMode && !loading && !error && Object.keys(filteredItems).length > 0 && (
+          <div className="space-y-8">
+            {Object.entries(filteredItems).map(([category, items]) => (
+              <div key={category} className="bg-white rounded-xl shadow-lg overflow-hidden">
+                {/* Category Header */}
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center">
+                    {getCategoryIcon(category)}
+                    <h3 className="ml-3 text-2xl font-bold text-gray-900 capitalize">{category}</h3>
+                    <span className="ml-auto bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+                      {items.length} items
                     </span>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                <div className="p-6">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {items.map(item => (
+                          <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10">
+                                  {getCategoryIcon(item.category)}
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900">
+                                {item.description || "No description available"}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {item.quantity} {item.unit}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-bold text-blue-600">₹{item.price}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                item.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                              }`}>
+                                {item.isActive ? "Available" : "Unavailable"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button
+                                onClick={() => {
+                                  setSelectedItem(item)
+                                  setOrderQuantity(1)
+                                  setOrderRemarks("")
+                                  setShowOrderDialog(true)
+                                }}
+                                disabled={!item.isActive || !isCurrentDay(selectedDay)}
+                                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                                  item.isActive && isCurrentDay(selectedDay)
+                                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                }`}
+                              >
+                                {!isCurrentDay(selectedDay)
+                                  ? "View Only"
+                                  : item.isActive
+                                    ? "Add to Cart"
+                                    : "Unavailable"}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && Object.keys(filteredItems).length === 0 && !searchMode && (
+          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+            <ChefHat className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+            <h3 className="text-xl font-medium text-gray-900 mb-2">No items available</h3>
+            <p className="text-gray-500">No menu items found for {selectedDay}</p>
+          </div>
+        )}
+
+        {/* Order Dialog */}
+        {showOrderDialog && selectedItem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">Add to Cart</h3>
+                <button
+                  onClick={() => setShowOrderDialog(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex items-center mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-teal-50 to-blue-50 rounded-lg flex items-center justify-center mr-4">
+                    {getCategoryIcon(selectedItem.category)}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900">{selectedItem.name}</h4>
+                    <p className="text-blue-500 font-bold text-xl">₹{selectedItem.price}</p>
+                  </div>
+                </div>
+                {selectedItem.description && <p className="text-gray-600 text-sm">{selectedItem.description}</p>}
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                <div className="flex items-center justify-center space-x-4">
+                  <button
+                    onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))}
+                    className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-2xl font-bold text-gray-900 w-12 text-center">{orderQuantity}</span>
+                  <button
+                    onClick={() => setOrderQuantity(orderQuantity + 1)}
+                    className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center hover:bg-teal-200 transition-colors"
+                  >
+                    <Plus className="w-4 h-4 text-teal-600" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Special Instructions (Optional)</label>
+                <textarea
+                  value={orderRemarks}
+                  onChange={(e) => setOrderRemarks(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  rows={3}
+                  placeholder="Any special requests..."
+                />
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-lg font-medium text-gray-700">Total:</span>
+                  <span className="text-2xl font-bold text-blue-600">
+                    ₹{(selectedItem.price * orderQuantity).toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowOrderDialog(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmOrder}
+                    disabled={orderingItem === selectedItem.id}
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {orderingItem === selectedItem.id ? (
+                      <>
+                        <Loader className="animate-spin w-4 h-4 mr-2" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Add to Cart
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cart Sidebar */}
+        {showCart && (
+          <div className="fixed inset-0 z-50 overflow-hidden">
+            <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowCart(false)} />
+            <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl">
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 flex items-center">
+                      <ShoppingCart className="w-6 h-6 mr-2 text-blue-500" />
+                      Your Cart
+                    </h3>
+                    {cartItems.length > 0 && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        {cartItems.reduce((sum, item) => sum + item.quantity, 0)} item
+                        {cartItems.reduce((sum, item) => sum + item.quantity, 0) !== 1 ? 's' : ''} • ₹
+                        {cartItems.reduce((sum, item) => sum + (item.priceAtOrder * item.quantity), 0).toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowCart(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6">
+                  {cartLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader className="animate-spin h-8 w-8 text-blue-500" />
+                      <span className="ml-2 text-gray-600">Loading cart...</span>
+                    </div>
+                  ) : cartItems.length === 0 ? (
+                    <div className="text-center py-12">
+                      <ShoppingCart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h4 className="text-lg font-medium text-gray-900 mb-2">Your cart is empty</h4>
+                      <p className="text-gray-500">Add some delicious items to get started!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {cartItems.map(item => (
+                        <div key={item.id} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-start">
+                            <div className="mr-4">
+                              {getCategoryIcon(item.category)}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex justify-between">
+                                <h4 className="font-medium text-gray-900">{item.itemName}</h4>
+                                <span className="font-bold text-blue-600">₹{(item.priceAtOrder * item.quantity).toFixed(2)}</span>
+                              </div>
+                              <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
+                              {item.remarks && (
+                                <p className="text-xs text-gray-500 mt-1">Note: {item.remarks}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="mt-3 flex justify-end">
+                            {item.status === "PENDING" && (
+                              <button
+                                onClick={() => handleCancelOrder(item.id)}
+                                className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center"
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
+                </div>
+
+                {cartItems.length > 0 && (
+                  <div className="border-t border-gray-200 p-6 bg-white">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-lg font-semibold text-gray-700">Total:</span>
+                      <span className="text-2xl font-bold text-blue-600">
+                        ₹{cartItems.reduce((sum, item) => sum + (item.priceAtOrder * item.quantity), 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <button
+                      className="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-all"
+                      onClick={() => {
+                        setShowCart(false)
+                        alert('Order placed successfully!')
+                      }}
+                    >
+                      Proceed to Checkout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Order Success Modal */}
+        {showOrderSuccess && orderSuccessData && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-sm mx-4 text-center shadow-2xl">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-500" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Order Added!</h3>
+              <div className="text-gray-600 mb-4">
+                <p className="mb-2">
+                  {orderSuccessData.quantity}x {orderSuccessData.itemName}
                 </p>
+                <p className="text-lg font-semibold text-blue-600">Total: ₹{orderSuccessData.totalPrice?.toFixed(2)}</p>
+                <p className="text-sm text-gray-500 mt-2">Order ID: #{orderSuccessData.orderId}</p>
+                {isAdmin && orderSuccessData.forEmployee && (
+                  <p className="text-sm text-gray-500 mt-1">Ordered for: {orderSuccessData.forEmployee}</p>
+                )}
+              </div>
+              <div className="flex space-x-3">
                 <button
                   onClick={() => setShowOrderSuccess(false)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                 >
-                  OK
+                  Continue Ordering
+                </button>
+                <button
+                  onClick={() => {
+                    setShowOrderSuccess(false)
+                    setShowCart(true)
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all"
+                >
+                  View Cart
                 </button>
               </div>
             </div>
@@ -520,5 +863,5 @@ export default function EmployeeMenu() {
         )}
       </div>
     </div>
-  );
+  )
 }

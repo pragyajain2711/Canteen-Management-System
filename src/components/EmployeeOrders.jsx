@@ -1,586 +1,589 @@
-import { useState, useEffect } from 'react';
-import { 
-  Loader, Plus, X, CheckCircle, ShoppingCart,
-  AlertCircle
-} from 'lucide-react';
-import api from './api';
-import {orderApi} from './api';
-import { useAuth } from './AuthContext';
+"use client"
+
+import { useState, useEffect } from "react"
+import {
+  Loader,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Calendar,
+  Clock,
+  Package,
+  Eye,
+  Trash2,
+  Filter,
+  Search,
+  ChefHat,
+} from "lucide-react"
+import api from "./api"
+import { orderApi } from "./api"
+import { useAuth } from "./AuthContext"
 
 export default function EmployeeOrders() {
   // Authentication and user context
-  const { employee, isAdmin } = useAuth();
+  const { employee, isAdmin } = useAuth()
 
   // Order listing state
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('current');
-  
-  // Order creation state
-  const [showOrderForm, setShowOrderForm] = useState(false);
-  const [orderContext, setOrderContext] = useState('self');
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [showEmployeeIdField, setShowEmployeeIdField] = useState(false);
-  const [menuItems, setMenuItems] = useState([]);
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [deliveryDate, setDeliveryDate] = useState('');
-  const [remarks, setRemarks] = useState('');
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState(null);
-  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
-  const [orderSuccessData, setOrderSuccessData] = useState(null);
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState("current")
+
+  // Admin ordering context
+  const [orderContext, setOrderContext] = useState("self")
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
+  const [showEmployeeIdField, setShowEmployeeIdField] = useState(false)
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
+  const [showOrderDetails, setShowOrderDetails] = useState(false)
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState(null)
+  const [todayOrdersCount, setTodayOrdersCount] = useState(0)
 
   // Fetch orders
   const fetchOrders = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
 
       // For admin ordering for employee
-      if (isAdmin && orderContext === 'employee') {
+      if (isAdmin && orderContext === "employee") {
         if (!selectedEmployeeId.trim()) {
-          setError("Please enter an employee ID");
-          setLoading(false);
-          return;
+          setError("Please enter an employee ID")
+          setLoading(false)
+          return
         }
       }
 
-      const effectiveEmployeeId = isAdmin && orderContext === 'employee' 
-        ? selectedEmployeeId 
-        : employee?.employeeId;
+      const effectiveEmployeeId = isAdmin && orderContext === "employee" ? selectedEmployeeId : employee?.employeeId
 
       if (!effectiveEmployeeId) {
-        setError("Employee ID not available");
-        setLoading(false);
-        return;
+        setError("Employee ID not available")
+        setLoading(false)
+        return
       }
 
-      const status = activeTab === 'current' 
-        ? ['PENDING', 'PREPARING', 'READY'].join(',')
-        : ['DELIVERED', 'CANCELLED'].join(',');
+      const response = await orderApi.getEmployeeOrders(effectiveEmployeeId)
+      console.log("Full API Response:", response)
 
-     
-      const response = await orderApi.getEmployeeOrders(effectiveEmployeeId);
-      console.log("Full API Response:", response); // Debug log
+      let filteredOrders = response.data || []
 
+      // Filter by date
+      filteredOrders = filteredOrders.filter(
+        (order) => new Date(order.expectedDeliveryDate).toISOString().split("T")[0] === selectedDate,
+      )
 
-      setOrders(response.data || []);
+      // Filter by tab
+      if (activeTab === "current") {
+        filteredOrders = filteredOrders.filter((order) => ["PENDING", "PREPARING", "READY"].includes(order.status))
+      } else {
+        filteredOrders = filteredOrders.filter((order) => ["DELIVERED", "CANCELLED"].includes(order.status))
+      }
+
+      // Filter by status
+      if (statusFilter !== "all") {
+        filteredOrders = filteredOrders.filter((order) => order.status?.toLowerCase() === statusFilter?.toLowerCase())
+      }
+
+      // Filter by search query
+      if (searchQuery.trim()) {
+        filteredOrders = filteredOrders.filter(
+          (order) =>
+            order.itemName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            order.id?.toString().includes(searchQuery),
+        )
+      }
+
+      setOrders(filteredOrders)
+
+      // Calculate today's total orders count for admin
+      if (isAdmin) {
+        const today = new Date().toISOString().split("T")[0]
+        const todayOrders = response.data?.filter(
+          (order) => new Date(order.expectedDeliveryDate).toISOString().split("T")[0] === today,
+        )
+        setTodayOrdersCount(todayOrders?.length || 0)
+      }
     } catch (err) {
-      console.error('Error:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to fetch orders');
-      setOrders([]);
+      console.error("Error:", err)
+      setError(err.response?.data?.message || err.message || "Failed to fetch orders")
+      setOrders([])
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
-  // Fetch menu items for order form
-  const fetchMenuItems = async () => {
-    try {
-      const response = await api.get('/api/menu/items/active');
-      setMenuItems(response.data);
-    } catch (err) {
-      console.error('Failed to fetch menu items', err);
-    }
-  };
+  }
 
   // Load data on component mount and when dependencies change
   useEffect(() => {
-    fetchOrders();
-    if (showOrderForm) {
-      fetchMenuItems();
-    }
-  }, [activeTab, orderContext, selectedEmployeeId, showOrderForm]);
+    fetchOrders()
+  }, [activeTab, orderContext, selectedEmployeeId, statusFilter, searchQuery, selectedDate])
 
   // Cancel an order
   const cancelOrder = async (orderId) => {
-    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+    if (!window.confirm("Are you sure you want to cancel this order?")) return
     try {
-      await api.delete(`/api/orders/${orderId}`);
-      fetchOrders();
+      await api.delete(`/api/orders/${orderId}`)
+      fetchOrders()
     } catch (err) {
-      alert(`Failed to cancel order: ${err.response?.data?.message || err.message}`);
+      alert(`Failed to cancel order: ${err.response?.data?.message || err.message}`)
     }
-  };
-
-  // Add item to order
-  const handleAddItem = (item) => {
-    setSelectedItems(prev => {
-      const existing = prev.find(i => i.menuId === item.menuId);
-      if (existing) {
-        return prev.map(i => 
-          i.menuId === item.menuId ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { ...item, quantity: 1 }];
-    });
-  };
-
-  // Change item quantity
-  const handleQuantityChange = (menuId, quantity) => {
-    if (quantity < 1) return;
-    setSelectedItems(prev =>
-      prev.map(item => 
-        item.menuId === menuId ? { ...item, quantity } : item
-      )
-    );
-  };
-
-  // Submit new order
-  const handleSubmitOrder = async () => {
-    if (selectedItems.length === 0) {
-      setFormError('Please select at least one item');
-      return;
-    }
-
-    try {
-      setFormLoading(true);
-      setFormError(null);
-      
-      // Determine the employee ID for the order
-      let orderEmployeeId;
-      if (isAdmin && orderContext === 'employee') {
-        if (!selectedEmployeeId) {
-          setFormError('Please select an employee ID');
-          return;
-        }
-        orderEmployeeId = selectedEmployeeId;
-      } else {
-        if (!employee?.employeeId) {
-          setFormError('Employee ID not available');
-          return;
-        }
-        orderEmployeeId = employee.employeeId;
-      }
-
-      const orderRequests = selectedItems.map(item => ({
-        employeeId: orderEmployeeId,
-        menuId: item.menuId,
-        quantity: item.quantity,
-        expectedDeliveryDate: deliveryDate || new Date().toISOString().split('T')[0],
-        remarks: `${remarks} ${isAdmin ? `(Ordered by admin for ${orderContext === 'employee' ? 'employee ' + selectedEmployeeId : 'self'})` : ''}`
-      }));
-
-      // Submit all orders
-      const responses = await Promise.all(
-        orderRequests.map(order => api.post('/api/orders', order))
-      );
-
-      // Show success message
-      setOrderSuccessData({
-        itemCount: selectedItems.length,
-        orderIds: responses.map(r => r.data.id)
-      });
-      setShowOrderSuccess(true);
-      
-      // Reset form and refresh orders
-      setSelectedItems([]);
-      setDeliveryDate('');
-      setRemarks('');
-      fetchOrders();
-    } catch (err) {
-      setFormError(err.response?.data?.message || 'Failed to place order');
-      console.error('Order submission error:', err);
-    } finally {
-      setFormLoading(false);
-    }
-  };
+  }
 
   // Status badge component
   const StatusBadge = ({ status }) => {
-    const statusClasses = {
-      PENDING: 'bg-yellow-100 text-yellow-800',
-      PREPARING: 'bg-blue-100 text-blue-800',
-      READY: 'bg-green-100 text-green-800',
-      DELIVERED: 'bg-purple-100 text-purple-800',
-      CANCELLED: 'bg-red-100 text-red-800'
-    };
-    
+    const statusConfig = {
+      PENDING: { bg: "bg-yellow-200", text: "text-yellow-900", icon: Clock },
+      PREPARING: { bg: "bg-blue-200", text: "text-blue-900", icon: ChefHat },
+      READY: { bg: "bg-green-200", text: "text-green-900", icon: CheckCircle },
+      DELIVERED: { bg: "bg-purple-200", text: "text-purple-900", icon: Package },
+      CANCELLED: { bg: "bg-red-200", text: "text-red-900", icon: X },
+    }
+
+    const config = statusConfig[status] || statusConfig.PENDING
+    const IconComponent = config.icon
+
     return (
-      <span className={`px-2 py-1 rounded-full text-xs ${statusClasses[status]}`}>
+      <span
+        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${config.bg} ${config.text} border-2 border-gray-400`}
+      >
+        <IconComponent className="w-3 h-3 mr-1" />
         {status.toLowerCase()}
       </span>
-    );
-  };
+    )
+  }
+
+  // Get category icon
+  const getCategoryIcon = (category) => {
+    switch (category?.toLowerCase()) {
+      case "breakfast":
+        return "🌅"
+      case "lunch":
+        return "🍽️"
+      case "thali":
+        return "🍛"
+      case "snacks":
+        return "🍿"
+      case "beverages":
+        return "🥤"
+      default:
+        return "🍴"
+    }
+  }
 
   // Render loading state
-  if (loading && !showOrderForm) {
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader className="animate-spin h-12 w-12 text-blue-500" />
+      <div className="min-h-screen bg-gray-100 flex justify-center items-center">
+        <div className="text-center">
+          <Loader className="animate-spin h-16 w-16 text-blue-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Loading your orders...</h3>
+          <p className="text-gray-700 font-medium">Please wait while we fetch your delicious orders</p>
+        </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Global error display */}
-      {error && !error.includes("Please enter") && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-          <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-            <div>
-              <span className="text-red-700 font-medium">{error}</span>
-              {error.includes("not found") && (
-                <p className="text-sm text-red-600 mt-1">
-                  Please verify the employee ID is correct
-                </p>
-              )}
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        {/* Global error display */}
+        {error && !error.includes("Please enter") && (
+          <div className="bg-red-100 border-l-4 border-red-600 rounded-lg p-4 mb-6 shadow-lg">
+            <div className="flex items-center">
+              <AlertCircle className="h-6 w-6 text-red-600 mr-3" />
+              <div>
+                <span className="text-red-800 font-bold text-lg">{error}</span>
+                {error.includes("not found") && (
+                  <p className="text-sm text-red-700 mt-1 font-medium">Please verify the employee ID is correct</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Header and Controls */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{isAdmin ? 'Orders Management' : 'My Orders'}</h1>
-        <button 
-          onClick={() => setShowOrderForm(true)}
-          className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={18} className="mr-2" />
-          New Order
-        </button>
-      </div>
+        {/* Header with Admin Controls on the side */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            {/* Left side - Title */}
+            <div className="flex items-center">
+              <div className="bg-blue-500 p-4 rounded-lg mr-4 shadow-lg">
+                <Package className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900">{isAdmin ? "Orders Management" : "My Orders"}</h1>
+                <p className="text-gray-700 text-lg font-medium">Track and manage your food orders</p>
+                {isAdmin && <p className="text-gray-700 text-sm font-medium">Today's Orders: {todayOrdersCount}</p>}
+              </div>
+            </div>
 
-      {/* Admin Controls */}
-      {isAdmin && (
-        <div className="mb-6 bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center space-x-4 mb-4">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                checked={orderContext === 'self'}
-                onChange={() => {
-                  setOrderContext('self');
-                  setShowEmployeeIdField(false);
-                  setError(null);
-                }}
-                className="mr-2"
-              />
-              Order for myself
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                checked={orderContext === 'employee'}
-                onChange={() => {
-                  setOrderContext('employee');
-                  setShowEmployeeIdField(true);
-                  setError(null);
-                }}
-                className="mr-2"
-              />
-              Order for employee
-            </label>
+            {/* Right side - Admin Controls */}
+            {isAdmin && (
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4">
+                <div className="flex items-center space-x-4 mb-3">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={orderContext === "self"}
+                      onChange={() => {
+                        setOrderContext("self")
+                        setShowEmployeeIdField(false)
+                        setError(null)
+                      }}
+                      className="mr-2 w-4 h-4 text-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                      👤 View my orders
+                    </span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={orderContext === "employee"}
+                      onChange={() => {
+                        setOrderContext("employee")
+                        setShowEmployeeIdField(true)
+                        setError(null)
+                      }}
+                      className="mr-2 w-4 h-4 text-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                      👥 View employee orders
+                    </span>
+                  </label>
+                </div>
+
+                {showEmployeeIdField && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      value={selectedEmployeeId}
+                      onChange={(e) => {
+                        setSelectedEmployeeId(e.target.value)
+                        if (error) setError(null)
+                      }}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                      placeholder="Enter employee ID"
+                    />
+                    {error?.includes("Please enter") && (
+                      <p className="mt-1 text-xs text-red-600 font-medium">Please enter a valid employee ID</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          
-          {showEmployeeIdField && (
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Employee ID *
-              </label>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div className="bg-white rounded-lg shadow-lg border-2 border-gray-200 p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5" />
               <input
                 type="text"
-                value={selectedEmployeeId}
-                onChange={(e) => {
-                  setSelectedEmployeeId(e.target.value);
-                  if (error) setError(null);
-                }}
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="Enter employee ID"
+                placeholder="Search orders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 text-gray-900 font-medium"
               />
-              {error?.includes("Please enter") && (
-                <p className="mt-1 text-sm text-red-600">
-                  Please enter a valid employee ID
-                </p>
-              )}
             </div>
-          )}
+
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white text-gray-900 font-medium"
+              >
+                <option value="all">All Status</option>
+                {activeTab === "current" ? (
+                  <>
+                    <option value="pending">⏳ Pending</option>
+                    <option value="preparing">👨‍🍳 Preparing</option>
+                    <option value="ready">✅ Ready</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="delivered">📦 Delivered</option>
+                    <option value="cancelled">❌ Cancelled</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className={`w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white text-gray-900 font-medium ${
+                  activeTab === "current" ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                disabled={activeTab === "current"}
+              />
+            </div>
+
+            <div className="flex items-center text-sm text-gray-800 font-bold">
+              <Calendar className="w-4 h-4 mr-2" />
+              Showing {orders.length} orders
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Order Tabs */}
-      <div className="flex border-b mb-6">
-        <button
-          className={`px-4 py-2 font-medium ${activeTab === 'current' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          onClick={() => setActiveTab('current')}
-        >
-          Current Orders
-        </button>
-        <button
-          className={`px-4 py-2 font-medium ${activeTab === 'history' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          onClick={() => setActiveTab('history')}
-        >
-          Order History
-        </button>
-      </div>
+        {/* Order Tabs */}
+        <div className="mb-6">
+          <div className="bg-white rounded-lg shadow-lg border-2 border-gray-200 p-2">
+            <div className="flex">
+              <button
+                className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
+                  activeTab === "current"
+                    ? "bg-blue-500 text-white shadow-lg"
+                    : "text-gray-700 hover:text-blue-500 hover:bg-blue-50"
+                }`}
+                onClick={() => setActiveTab("current")}
+              >
+                <div className="flex items-center justify-center">
+                  <Clock className="w-4 h-4 mr-2" />
+                  Current Orders
+                </div>
+              </button>
+              <button
+                className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
+                  activeTab === "history"
+                    ? "bg-blue-500 text-white shadow-lg"
+                    : "text-gray-700 hover:text-blue-500 hover:bg-blue-50"
+                }`}
+                onClick={() => setActiveTab("history")}
+              >
+                <div className="flex items-center justify-center">
+                  <Package className="w-4 h-4 mr-2" />
+                  Order History
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
 
-      {/* Orders Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Delivery Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+        {/* Orders Grid */}
+        {activeTab === "current" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {orders.map((order) => (
-              <tr key={order.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">#{order.id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.itemName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.quantity}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${order.priceAtOrder?.toFixed(2) || '0.00'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  ${order.totalPrice?.toFixed(2) || '0.00'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge status={order.status} />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(order.expectedDeliveryDate).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {order.status === 'PENDING' && (
-                    <button 
-                      onClick={() => cancelOrder(order.id)}
-                      className="text-red-600 hover:text-red-800 text-xs"
-                    >
-                      Cancel
-                    </button>
+              <div
+                key={order.id}
+                className="bg-white rounded-lg shadow-lg border-2 border-gray-300 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+              >
+                {/* Order Header */}
+                <div className="bg-gray-800 p-4 border-b-2 border-gray-400">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-bold text-white">Order #{order.id}</span>
+                    <StatusBadge status={order.status} />
+                  </div>
+                  <div className="flex items-center text-sm text-gray-300 font-medium">
+                    <Calendar className="w-4 h-4 mr-1" />
+                    {new Date(order.expectedDeliveryDate).toLocaleDateString()}
+                  </div>
+                </div>
+
+                {/* Order Content */}
+                <div className="p-4">
+                  <div className="flex items-center mb-3">
+                    <span className="text-2xl mr-3">{getCategoryIcon(order.category)}</span>
+                    <div>
+                      <h3 className="font-bold text-gray-900">{order.itemName}</h3>
+                      <p className="text-sm text-gray-700 font-medium">Quantity: {order.quantity}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm text-gray-700 font-medium">
+                      Unit Price: ₹{order.priceAtOrder?.toFixed(2) || "0.00"}
+                    </div>
+                    <div className="text-lg font-bold text-blue-500">₹{order.totalPrice?.toFixed(2) || "0.00"}</div>
+                  </div>
+
+                  {order.remarks && (
+                    <div className="bg-gray-100 rounded-lg p-3 mb-4 border-2 border-gray-300">
+                      <p className="text-xs text-gray-700 font-medium">
+                        <strong>Note:</strong> {order.remarks}
+                      </p>
+                    </div>
                   )}
-                </td>
-              </tr>
+
+                  {/* Order Actions */}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        setSelectedOrderDetails(order)
+                        setShowOrderDetails(true)
+                      }}
+                      className="flex-1 bg-gray-200 text-gray-800 py-2 px-3 rounded-lg text-sm font-bold hover:bg-gray-300 transition-colors flex items-center justify-center border-2 border-gray-400"
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      Details
+                    </button>
+                    {order.status === "PENDING" && (
+                      <button
+                        onClick={() => cancelOrder(order.id)}
+                        className="bg-red-200 text-red-800 py-2 px-3 rounded-lg text-sm font-bold hover:bg-red-300 transition-colors flex items-center justify-center border-2 border-red-400"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-        {orders.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            No {activeTab === 'current' ? 'current' : 'past'} orders found
-            {isAdmin && orderContext === 'employee' && selectedEmployeeId && ` for employee ${selectedEmployeeId}`}
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Order ID
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Item Name
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Quantity
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Total Price
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Status
+                    </th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Details</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {orders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{order.id}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="text-lg mr-2">{getCategoryIcon(order.category)}</span>
+                          <div className="text-sm text-gray-900">{order.itemName}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{order.quantity}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold text-blue-600">₹{order.totalPrice?.toFixed(2)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => {
+                            setSelectedOrderDetails(order)
+                            setShowOrderDetails(true)
+                          }}
+                          className="text-blue-600 hover:text-blue-900 font-medium"
+                        >
+                          Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {orders.length === 0 && !loading && (
+          <div className="bg-white rounded-lg shadow-lg p-12 text-center border-2 border-gray-200">
+            <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No orders found</h3>
+            <p className="text-gray-700 mb-6 font-medium">
+              {activeTab === "current" ? "You don't have any current orders." : "No order history available yet."}
+              {isAdmin && orderContext === "employee" && selectedEmployeeId && ` for employee ${selectedEmployeeId}`}
+            </p>
+          </div>
+        )}
+
+        {/* Order Details Modal */}
+        {showOrderDetails && selectedOrderDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-2xl shadow-2xl border-2 border-gray-300">
+              <div className="bg-blue-500 text-white p-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Order Details</h2>
+                  <button
+                    onClick={() => {
+                      setShowOrderDetails(false)
+                      setSelectedOrderDetails(null)
+                    }}
+                    className="text-white hover:text-gray-200 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold text-gray-900">Order #{selectedOrderDetails.id}</h3>
+                  <p className="text-gray-700">
+                    Item: {selectedOrderDetails.itemName} (Quantity: {selectedOrderDetails.quantity})
+                  </p>
+                  <p className="text-gray-700">
+                    Delivery Date: {new Date(selectedOrderDetails.expectedDeliveryDate).toLocaleDateString()}
+                  </p>
+                  <p className="text-gray-700">Total Price: ₹{selectedOrderDetails.totalPrice?.toFixed(2)}</p>
+                  <p className="text-gray-700">Status: {selectedOrderDetails.status}</p>
+                </div>
+                {selectedOrderDetails.remarks && (
+                  <div className="mb-4">
+                    <h4 className="text-lg font-bold text-gray-900">Remarks:</h4>
+                    <p className="text-gray-700">{selectedOrderDetails.remarks}</p>
+                  </div>
+                )}
+                <div className="text-right">
+                  <button
+                    onClick={() => {
+                      setShowOrderDetails(false)
+                      setSelectedOrderDetails(null)
+                    }}
+                    className="px-4 py-2 border-2 border-gray-400 rounded-lg text-gray-800 font-bold hover:bg-gray-100"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      {/* Order Form Modal */}
-      {showOrderForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">
-                {isAdmin 
-                  ? `Place Order for ${orderContext === 'employee' ? 'Employee' : 'Myself'}`
-                  : 'Place New Order'}
-              </h2>
-              <button 
-                onClick={() => {
-                  setShowOrderForm(false);
-                  setSelectedItems([]);
-                  setFormError(null);
-                }} 
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            {isAdmin && orderContext === 'employee' && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-blue-800">
-                  You are ordering for employee: <span className="font-bold">{selectedEmployeeId}</span>
-                </p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Available Items */}
-              <div>
-                <h3 className="font-medium mb-3">Available Items</h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {menuItems.length === 0 ? (
-                    <div className="text-center py-4 text-gray-500">
-                      <Loader className="animate-spin h-6 w-6 mx-auto mb-2" />
-                      Loading menu items...
-                    </div>
-                  ) : (
-                    menuItems.map(item => (
-                      <div key={item.menuId} className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50">
-                        <div>
-                          <div className="font-medium">{item.name}</div>
-                          <div className="text-sm text-gray-600">${item.price.toFixed(2)}</div>
-                          {item.description && (
-                            <div className="text-xs text-gray-500 mt-1">{item.description}</div>
-                          )}
-                        </div>
-                        <button 
-                          onClick={() => handleAddItem(item)}
-                          className="bg-blue-100 text-blue-600 px-3 py-1 rounded-lg text-sm hover:bg-blue-200"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Order Summary */}
-              <div>
-                <h3 className="font-medium mb-3">Order Summary</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Date</label>
-                    <input
-                      type="date"
-                      className="w-full border rounded-lg px-3 py-2"
-                      value={deliveryDate}
-                      min={new Date().toISOString().split('T')[0]}
-                      onChange={(e) => setDeliveryDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
-                    <textarea
-                      className="w-full border rounded-lg px-3 py-2"
-                      rows={3}
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder="Any special instructions..."
-                    />
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium mb-2">Selected Items</h4>
-                    {selectedItems.length === 0 ? (
-                      <p className="text-gray-500 text-sm">No items selected yet</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {selectedItems.map(item => (
-                          <div key={item.menuId} className="flex justify-between items-center p-2 border rounded-lg">
-                            <div className="flex-1">
-                              <div className="font-medium">{item.name}</div>
-                              <div className="text-sm text-gray-600">${item.price.toFixed(2)} each</div>
-                            </div>
-                                                        <div className="flex items-center space-x-2">
-                              <button 
-                                onClick={() => handleQuantityChange(item.menuId, item.quantity - 1)}
-                                className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
-                              >
-                                -
-                              </button>
-                              <span className="w-8 text-center">{item.quantity}</span>
-                              <button 
-                                onClick={() => handleQuantityChange(item.menuId, item.quantity + 1)}
-                                className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t pt-3">
-                    <div className="flex justify-between font-medium">
-                      <span>Total Amount:</span>
-                      <span>
-                        ${selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {formError && (
-                    <div className="text-red-500 text-sm">{formError}</div>
-                  )}
-
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                      onClick={() => {
-                        setShowOrderForm(false);
-                        setSelectedItems([]);
-                        setFormError(null);
-                      }}
-                      className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSubmitOrder}
-                      disabled={formLoading || selectedItems.length === 0}
-                      className={`px-4 py-2 rounded-lg flex items-center ${
-                        formLoading || selectedItems.length === 0
-                          ? 'bg-gray-300 cursor-not-allowed'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
-                    >
-                      {formLoading ? (
-                        <>
-                          <Loader className="animate-spin h-4 w-4 mr-2" />
-                          Placing Order...
-                        </>
-                      ) : (
-                        <>
-                          <ShoppingCart className="h-4 w-4 mr-2" />
-                          Place Order
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Order Success Modal */}
-      {showOrderSuccess && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm">
-            <div className="text-center">
-              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-              <h3 className="text-lg font-bold mb-2">Order Placed Successfully!</h3>
-              <p className="mb-4">
-                {orderSuccessData.itemCount > 1
-                  ? `Your ${orderSuccessData.itemCount} orders have been placed.`
-                  : 'Your order has been placed.'}
-                <br />
-                {orderSuccessData.orderIds.length > 1 ? (
-                  <span className="text-sm text-gray-600">
-                    Order IDs: {orderSuccessData.orderIds.join(', ')}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-600">
-                    Order ID: {orderSuccessData.orderIds[0]}
-                  </span>
-                )}
-              </p>
-              <button
-                onClick={() => {
-                  setShowOrderSuccess(false);
-                  setShowOrderForm(false);
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  );
+  )
 }
