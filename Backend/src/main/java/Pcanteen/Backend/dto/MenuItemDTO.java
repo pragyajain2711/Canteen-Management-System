@@ -5,6 +5,8 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+import Pcanteen.Backend.model.MenuItem;
+
 @Data
 public class MenuItemDTO {
     private Long id;
@@ -153,7 +155,7 @@ public class MenuItemDTO {
 	public void setAvailableStatus(Boolean availableStatus) {
 		this.availableStatus = availableStatus;
 	}
-	public MenuItemDTO(Long id, String menuId, String name, String description, Double quantity, String unit,
+	/*public MenuItemDTO(Long id, String menuId, String name, String description, Double quantity, String unit,
 			Double price, LocalDateTime startDate, LocalDateTime endDate, String category, Boolean isActive,
 			LocalDateTime createdAt, String createdBy, LocalDateTime updatedAt, String updatedBy,
 			Boolean availableStatus) {
@@ -174,7 +176,27 @@ public class MenuItemDTO {
 		this.updatedAt = updatedAt;
 		this.updatedBy = updatedBy;
 		this.availableStatus = availableStatus;
+	}*/
+	
+	public MenuItemDTO(MenuItem item) {
+	    this.id = item.getId();
+	    this.menuId = item.getMenuId();
+	    this.name = item.getName();
+	    this.description = item.getDescription();
+	    this.quantity = item.getQuantity();
+	    this.unit = item.getUnit();
+	    this.price = item.getPrice();
+	    this.startDate = item.getStartDate();
+	    this.endDate = item.getEndDate();
+	    this.category = item.getCategory();
+	    this.isActive = item.getIsActive();
+	    this.createdAt = item.getCreatedAt();
+	    this.createdBy = item.getCreatedBy();
+	    this.updatedAt = item.getUpdatedAt();
+	    this.updatedBy = item.getUpdatedBy();
+	    this.availableStatus = item.getAvailableStatus();
 	}
+
     
     
 }

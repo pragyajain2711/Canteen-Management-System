@@ -154,11 +154,12 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderMenuItem(orderId));
     }
     
-   /* @GetMapping("/{orderId}/price-history")
+   @GetMapping("/{orderId}/price-history")
     public ResponseEntity<List<PriceHistoryDTO>> getOrderPriceHistory(
             @PathVariable Long orderId) {
         return ResponseEntity.ok(orderService.getOrderPriceHistory(orderId));
-    }*/
+    }
+  
     
     // Enhance search to include business IDs
     @GetMapping("/search")

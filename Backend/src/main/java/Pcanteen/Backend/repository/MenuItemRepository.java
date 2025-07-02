@@ -50,5 +50,7 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
     Optional<MenuItem> findByMenuId(String menuId);
     List<MenuItem> findByNameOrderByCreatedAtDesc(String name);
 
+	List<MenuItem> findByName(String name);
+
     
 }

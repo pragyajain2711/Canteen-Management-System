@@ -12,7 +12,10 @@ import org.springframework.stereotype.Service;
 import Pcanteen.Backend.config.AppConfig;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -62,50 +65,97 @@ public class MenuItemService {
     }
 
     public MenuItemDTO updateMenuItem(Long id, MenuItemRequest request, String updatedBy) {
-        MenuItem existingItem = menuItemRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Menu item not found"));
-
-        // If price changed, create new items for all categories
-        if (!existingItem.getPrice().equals(request.getPrice())) {
-            // End validity of existing item
-            existingItem.setEndDate(LocalDateTime.now().minusDays(1));
-            menuItemRepository.save(existingItem);
-
-            // Create new items for all categories
-            if (request.getCategories() == null || request.getCategories().isEmpty()) {
-                throw new IllegalArgumentException("At least one category must be specified");
-            }
-
-            MenuItemDTO firstItem = null;
-            for (String category : request.getCategories()) {
-                MenuItem newItem = modelMapper.map(request, MenuItem.class);
-                newItem.setCategory(category);
-                newItem.setCreatedBy(updatedBy);
-                newItem.setAvailableStatus(request.getAvailableStatus());
-                newItem.setStartDate(LocalDateTime.now()); // New price starts today
-                newItem.setMenuId(null); // Generate new ID
-                
-                MenuItem savedItem = menuItemRepository.save(newItem);
-                if (firstItem == null) {
-                    firstItem = modelMapper.map(savedItem, MenuItemDTO.class);
-                }
-            }
-            return firstItem;
+        Optional<MenuItem> existingOptional = menuItemRepository.findById(id);
+        if (existingOptional.isEmpty()) {
+            throw new RuntimeException("Menu item not found");
         }
 
-        // For non-price updates
-        existingItem.setDescription(request.getDescription());
-        existingItem.setQuantity(request.getQuantity());
-        existingItem.setUnit(request.getUnit());
-        existingItem.setStartDate(request.getStartDate());
-        existingItem.setEndDate(request.getEndDate());
-        existingItem.setAvailableStatus(request.getAvailableStatus());
-        existingItem.setUpdatedBy(updatedBy);
-        
-        // Keep original category - don't update from request
-        MenuItem updatedItem = menuItemRepository.save(existingItem);
-        return modelMapper.map(updatedItem, MenuItemDTO.class);
+        MenuItem existing = existingOptional.get();
+
+        boolean priceChanged = !Objects.equals(existing.getPrice(), request.getPrice());
+
+        // If price changed → Create new row (instead of modifying existing one)
+        if (priceChanged) {
+            MenuItem newItem = new MenuItem();
+            newItem.setName(request.getName());
+            newItem.setDescription(request.getDescription());
+            newItem.setCategory(existing.getCategory()); // exact same category
+            newItem.setPrice(request.getPrice());
+            newItem.setUnit(request.getUnit());
+            newItem.setQuantity(request.getQuantity());
+            newItem.setAvailableStatus(request.getAvailableStatus());
+            newItem.setStartDate(request.getStartDate());
+            newItem.setEndDate(request.getEndDate());
+            newItem.setCreatedBy(existing.getCreatedBy());
+            newItem.setUpdatedBy(updatedBy); // ✅ Set updater
+            menuItemRepository.save(newItem);
+            return new MenuItemDTO(newItem);
+        }
+
+        // Otherwise just update the existing item
+        existing.setName(request.getName());
+        existing.setDescription(request.getDescription());
+        existing.setPrice(request.getPrice());
+        existing.setUnit(request.getUnit());
+        existing.setQuantity(request.getQuantity());
+        existing.setAvailableStatus(request.getAvailableStatus());
+        existing.setStartDate(request.getStartDate());
+        existing.setEndDate(request.getEndDate());
+        existing.setUpdatedBy(updatedBy); // ✅ Set updater
+        menuItemRepository.save(existing);
+
+        return new MenuItemDTO(existing);
     }
+
+    
+    
+   /* public void updateMenuItem(Long id, MenuItemRequest request) {
+        Optional<MenuItem> existingOptional = menuItemRepository.findById(id);
+        if (existingOptional.isEmpty()) {
+            throw new RuntimeException("Menu item not found");
+        }
+
+        MenuItem existing = existingOptional.get();
+        String name = request.getName();
+
+        List<MenuItem> existingVariants = menuItemRepository.findByName(name);
+        Set<String> existingCategories = existingVariants.stream()
+            .map(MenuItem::getCategory)
+            .collect(Collectors.toSet());
+
+        Set<String> incomingCategories = new HashSet<>(request.getCategories());
+
+        // ✅ 1. Update only the current row (the one being edited)
+        existing.setName(request.getName());
+        existing.setDescription(request.getDescription());
+        existing.setPrice(request.getPrice());
+        existing.setUnit(request.getUnit());
+        existing.setQuantity(request.getQuantity());
+        existing.setAvailableStatus(request.getAvailableStatus());
+        existing.setStartDate(request.getStartDate());
+        existing.setEndDate(request.getEndDate());
+        menuItemRepository.save(existing);
+
+        // ✅ 2. Create rows only for truly new categories
+        Set<String> newCategories = incomingCategories.stream()
+            .filter(cat -> !existingCategories.contains(cat))
+            .collect(Collectors.toSet());
+
+        for (String newCategory : newCategories) {
+            MenuItem newItem = new MenuItem();
+            newItem.setName(request.getName());
+            newItem.setDescription(request.getDescription());
+            newItem.setCategory(newCategory);
+            newItem.setPrice(request.getPrice());
+            newItem.setUnit(request.getUnit());
+            newItem.setQuantity(request.getQuantity());
+            newItem.setAvailableStatus(request.getAvailableStatus());
+            newItem.setStartDate(request.getStartDate());
+            newItem.setEndDate(request.getEndDate());
+            menuItemRepository.save(newItem);
+        }
+    }*/
+
   
   /*  public MenuItemDTO createMenuItem(MenuItemRequest request, String createdBy) {
         MenuItem menuItem = modelMapper.map(request, MenuItem.class);

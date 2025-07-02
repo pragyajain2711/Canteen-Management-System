@@ -12,12 +12,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class WeeklyMenuService {
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WeeklyMenuService.class);
 
     private final WeeklyMenuRepository weeklyMenuRepository;
     private final MenuItemRepository menuItemRepository; // Add this
@@ -137,4 +139,66 @@ public class WeeklyMenuService {
     public void deleteWeeklyMenuItem(Long id) {
         weeklyMenuRepository.deleteById(id);
     }
+    
+   /* public void clearWeek(LocalDateTime startDate, LocalDateTime endDate) {
+        List<WeeklyMenu> items = weeklyMenuRepository.findWeeklyMenusBetweenDates(startDate, endDate);
+
+        log.warn("Clearing week between {} and {} — {} items found", startDate, endDate, items.size());
+
+        items.forEach(item -> {
+            log.warn("Will delete: ID={} WeekStart={} Day={} Category={} MenuItem={}",
+                item.getId(), item.getWeekStartDate(), item.getDayOfWeek(), item.getMealCategory(), item.getMenuItem().getName());
+        });
+
+        weeklyMenuRepository.deleteAll(items);
+    }*/
+
+    
+
+    
+    public void copyPreviousWeekMenu(LocalDateTime currentWeekStart, String username) {
+        LocalDate today = LocalDate.now();
+        LocalDate previousWeekStart = currentWeekStart.toLocalDate().minusWeeks(1);
+
+        if (previousWeekStart.isAfter(today)) {
+            log.warn("Skipping copy: source week {} is in the future.", previousWeekStart);
+            return;
+        }
+
+        LocalDateTime previousStart = previousWeekStart.atStartOfDay();
+        LocalDateTime previousEnd = previousStart.plusDays(6).withHour(23).withMinute(59);
+
+        List<WeeklyMenu> previousItems = weeklyMenuRepository.findWeeklyMenusBetweenDates(previousStart, previousEnd);
+
+        if (previousItems.isEmpty()) {
+            log.warn("No data in previous week ({}) to copy.", previousWeekStart);
+            return;
+        }
+
+        List<WeeklyMenu> copiedItems = previousItems.stream()
+            .map(item -> {
+                WeeklyMenu newItem = new WeeklyMenu();
+
+                // DO NOT set the same ID
+                newItem.setDayOfWeek(item.getDayOfWeek());
+                newItem.setMealCategory(item.getMealCategory());
+
+                // Keep reference to existing menu item
+                newItem.setMenuItem(item.getMenuItem());
+
+                // NEW week dates
+                newItem.setWeekStartDate(currentWeekStart);
+                newItem.setWeekEndDate(currentWeekStart.plusDays(6));
+
+                newItem.setCreatedBy(username);
+                newItem.setCreatedAt(LocalDateTime.now());
+
+                return newItem;
+            })
+            .collect(Collectors.toList());
+
+        weeklyMenuRepository.saveAll(copiedItems);
+    }
+
+
 }

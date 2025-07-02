@@ -10,6 +10,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import Pcanteen.Backend.dto.DayOfWeek; // ✅ This is your custom enum
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -119,6 +121,24 @@ public class MenuController {
         return ResponseEntity.ok(weeklyMenuService.getWeeklyMenuForDay(date, dayOfWeek, category));
     }
 
+ // Add this to MenuController.java
+    @PostMapping("/weekly/copy-previous")
+    public ResponseEntity<Void> copyPreviousWeekMenu(
+        @RequestParam("currentWeekStart") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate currentWeekStart,
+        @AuthenticationPrincipal UserDetails userDetails) {
+
+        weeklyMenuService.copyPreviousWeekMenu(currentWeekStart.atStartOfDay(), userDetails.getUsername());
+        return ResponseEntity.ok().build();
+    }
+
+   /* @DeleteMapping("/weekly/clear")
+    public ResponseEntity<Void> clearWeeklyMenu(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        weeklyMenuService.clearWeek(startDate.atStartOfDay(), endDate.atTime(23, 59, 59));
+        return ResponseEntity.ok().build();
+    }*/
 
 
 
