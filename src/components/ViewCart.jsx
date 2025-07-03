@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { ShoppingCart, X, Trash2, CheckCircle, Package, ChefHat, Coffee, Utensils, Cookie, Wine } from "lucide-react"
-
+import EmployeeMenu from "./EmployeeMenu"
 export default function CartPreview() {
   const [showCart, setShowCart] = useState(true)
   const [cartItems] = useState([]) // Empty cart - will be populated by employee actions

@@ -92,7 +92,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 //import CanteenHomePage from "./components/CanteenHomePage";
 import EmployeeMenu from "./components/EmployeeMenu";
-import Cart from "./components/Cart";
+import ViewCart from "./components/ViewCart";
 import SignUp from "./components/SignUp";
 import SignIn from "./components/SignIn";
 import { AuthProvider } from './components/AuthContext';
@@ -126,6 +126,7 @@ function App() {
             <Route path="/sign_in" element={<SignIn />} />
             <Route path="/menu" element={<EmployeeMenu />} />
             <Route path="/order" element={<EmployeeOrders />} />
+            <Route path="/cart" element={<ViewCart />} />
             
             {/* Regular protected route */}
             <Route 
