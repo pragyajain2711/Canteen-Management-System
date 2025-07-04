@@ -69,11 +69,12 @@ public class SecurityConfig {
              .authorizeHttpRequests(auth -> auth
                  .requestMatchers("/api/auth/**").permitAll()
                  .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
-                 .requestMatchers("/api/menu/**").hasRole("ADMIN")
+                // .requestMatchers("/api/menu/**").hasRole("ADMIN","EMPLOYEE")
                  .requestMatchers("/api/menu/**").permitAll()
-                 .requestMatchers("/api/menu/**").hasRole("ADMIN")
+                 //.requestMatchers("/api/menu/**").hasRole("ADMIN")
+                // .requestMatchers("/api/transactions/**").hasRole("ADMIN")
                  .requestMatchers("/api/orders/**").permitAll()
-
+                 .requestMatchers("/api/transactions/**").permitAll()
                  .anyRequest().authenticated()
              )
              .sessionManagement(sess -> 

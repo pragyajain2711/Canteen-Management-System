@@ -5,6 +5,8 @@ import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import Pcanteen.Backend.dto.MenuItemDTO;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -261,5 +263,26 @@ public class MenuItem {
 				+ createdAt + ", createdBy=" + createdBy + ", updatedAt=" + updatedAt + ", updatedBy=" + updatedBy
 				+ "]";
 	}*/
+	
+	public MenuItemDTO toDTO() {
+	    MenuItemDTO dto = new MenuItemDTO();
+	    dto.setId(this.id);
+	    dto.setMenuId(this.menuId);
+	    dto.setName(this.name);
+	    dto.setDescription(this.description);
+	    dto.setQuantity(this.quantity);
+	    dto.setUnit(this.unit);
+	    dto.setPrice(this.price);
+	    dto.setStartDate(this.startDate);
+	    dto.setEndDate(this.endDate);
+	    dto.setCategory(this.category);
+	    dto.setIsActive(this.isActive);
+	    dto.setCreatedAt(this.createdAt);
+	    dto.setCreatedBy(this.createdBy);
+	    dto.setUpdatedAt(this.updatedAt);
+	    dto.setUpdatedBy(this.updatedBy);
+	    dto.setAvailableStatus(this.availableStatus);
+	    return dto;
+	}
     
 }

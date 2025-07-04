@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import Pcanteen.Backend.dto.AuthResponse;
+
 @Entity
 @Table(name = "employee")
 @Data
@@ -254,7 +256,15 @@ public class Employee {
 		this.createdAt = createdAt;
 	}
     
-    
+	public AuthResponse toDTO() {
+	    AuthResponse dto = new AuthResponse();
+	  //  dto.setId(this.id);
+	    dto.setEmployeeId(this.employeeId);
+	    dto.setFirstName(this.firstName);
+	    dto.setLastName(this.lastName);
+	    dto.setDepartment(this.department);
+	    return dto;
+	}
     
     
     

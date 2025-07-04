@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -65,5 +66,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> , JpaSpecifi
         @Param("endDate") LocalDate endDate,
         @Param("department") String department,
         @Param("category") String category);
-}
+    
+    
+    
+    
+    @Query("SELECT o FROM Order o JOIN o.employee e WHERE e.employeeId = :employeeId AND o.status IN :statuses")
+    List<Order> findByEmployeeIdAndStatusIn(@Param("employeeId") String employeeId, 
+                                          @Param("statuses") List<String> statuses);
+        
+    @Query("SELECT o FROM Order o JOIN o.employee e WHERE e.employeeId = :employeeId AND o.status = :status AND o.orderTime BETWEEN :start AND :end")
+    List<Order> findByEmployeeIdAndStatusAndOrderTimeBetween(
+        @Param("employeeId") String employeeId,
+        @Param("status") String status,
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end);
 
+
+}
