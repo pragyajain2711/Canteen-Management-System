@@ -195,7 +195,7 @@ function Navbar() {
                   </div>
 
                   {/* Transaction History */}
-                  <div
+                 {/*} <div
                     className="bg-green-50 rounded-lg p-4 border border-green-200 hover:bg-green-100 transition-colors cursor-pointer"
                     onClick={() => {
                       setHamburgerMenuOpen(false)
@@ -212,7 +212,26 @@ function Navbar() {
                         <p className="text-sm text-gray-600">View payment records</p>
                       </div>
                     </div>
-                  </div>
+                  </div>*/}
+
+{isAuthenticated && (
+  <Link to="/bills" className="block">
+    <div
+      className="bg-green-50 rounded-lg p-4 border border-green-200 hover:bg-green-100 transition-colors cursor-pointer"
+      onClick={() => setHamburgerMenuOpen(false)}
+    >
+      <div className="flex items-center space-x-3">
+        <div className="bg-green-100 p-2 rounded-lg">
+          <CreditCard className="w-5 h-5 text-green-600" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-gray-800">My Bills & Payments</h3>
+          <p className="text-sm text-gray-600">View and pay your canteen bills</p>
+        </div>
+      </div>
+    </div>
+  </Link>
+)}
 
                   {/* Settings */}
                   <div

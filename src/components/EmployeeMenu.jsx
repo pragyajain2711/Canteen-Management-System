@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react"
-import { employeeMenuApi, menuApi } from "./api"
+import { employeeMenuApi } from "./api"
 import api from "./api"
 import { useAuth } from "./AuthContext"
 import {
@@ -24,41 +23,314 @@ import {
 } from "lucide-react"
 
 export default function EmployeeMenu() {
-  const { employee, isAdmin } = useAuth()
-  
-  // State variables
+  // State for menu data and filtering
   const [menuItems, setMenuItems] = useState([])
-  const [filteredItems, setFilteredItems] = useState({})
+  const [filteredItems, setFilteredItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedDay, setSelectedDay] = useState("WEDNESDAY")
+  const [selectedDay, setSelectedDay] = useState("WEDNESDAY") // Current day
   const [searchQuery, setSearchQuery] = useState("")
-  const [searchMode, setSearchMode] = useState(false)
   const [filters, setFilters] = useState({
     category: "all",
     status: "active",
   })
 
-  // Order dialog state
+  // State for order dialog
   const [showOrderDialog, setShowOrderDialog] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [orderQuantity, setOrderQuantity] = useState(1)
   const [orderRemarks, setOrderRemarks] = useState("")
   const [orderingItem, setOrderingItem] = useState(null)
 
-  // Cart state
+  // State for cart
   const [cartItems, setCartItems] = useState([])
   const [showCart, setShowCart] = useState(false)
   const [cartLoading, setCartLoading] = useState(false)
 
-  // Success notification
+  // State for success notifications
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
   const [orderSuccessData, setOrderSuccessData] = useState(null)
 
   // Admin ordering context
+  const { employee, isAdmin, admin } = useAuth()
   const [orderContext, setOrderContext] = useState("self")
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
 
+  // New state for managing cart items before they become orders
+  const [pendingCartItems, setPendingCartItems] = useState([])
+
+  // Get current day
+  const getCurrentDay = () => {
+    const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+    const today = new Date().getDay()
+    return days[today]
+  }
+
+  // Load menu items
+  const loadMenuItems = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const response = await employeeMenuApi.getWeeklyMenu(selectedDay, filters.category)
+      const items = response.data.map((item) => item.menuItem)
+      setMenuItems(items)
+      setFilteredItems(items)
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load menu items")
+      console.error("API Error:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCartItems = async () => {
+    try {
+      setCartLoading(true)
+      const employeeId =
+        isAdmin && orderContext === "employee"
+          ? selectedEmployeeId
+          : employee?.employeeId || (isAdmin ? admin?.employeeId : null)
+
+      if (!employeeId) {
+        setCartItems([])
+        return
+      }
+
+      console.log("Loading cart for employee:", employeeId)
+      const response = await api.get(`/api/orders/pending/${employeeId}`)
+      console.log("Cart response:", response.data)
+
+      // Enhanced data structure with proper cart item format
+      const items = Array.isArray(response.data)
+        ? response.data.map((item) => ({
+            ...item,
+            itemName: item.itemName || item.name || "Unknown Item",
+            priceAtOrder: Number.parseFloat(item.priceAtOrder || item.price || 0),
+            quantity: Number.parseInt(item.quantity || 1),
+            totalPrice: Number.parseFloat(item.priceAtOrder || item.price || 0) * Number.parseInt(item.quantity || 1),
+            status: item.status || "PENDING",
+            category: item.category || "general",
+          }))
+        : []
+
+      setCartItems(items)
+    } catch (err) {
+      console.error("Failed to load cart items:", err)
+      setCartItems([])
+    } finally {
+      setCartLoading(false)
+    }
+  }
+
+  // Handle search
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadMenuItems()
+      return
+    }
+
+    try {
+      setLoading(true)
+      const response = await employeeMenuApi.searchItems(searchQuery)
+      const items = response.data.filter((item) => filters.status === "all" || item.isActive)
+      setMenuItems(items)
+      setFilteredItems(items)
+    } catch (err) {
+      setError(err.response?.data?.message || "Search failed")
+      console.error("Search Error:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Filter items based on search and filters
+  useEffect(() => {
+    let filtered = menuItems
+
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (item) =>
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase())),
+      )
+    }
+
+    if (filters.status !== "all") {
+      filtered = filtered.filter((item) => (filters.status === "active" ? item.isActive : !item.isActive))
+    }
+
+    setFilteredItems(filtered)
+  }, [menuItems, searchQuery, filters.status])
+
+  // Load menu items when day or category changes
+  useEffect(() => {
+    loadMenuItems()
+  }, [selectedDay, filters.category])
+
+  // Load cart items on mount and when context changes
+  useEffect(() => {
+    loadCartItems()
+  }, [orderContext, selectedEmployeeId])
+
+  // Handle opening order dialog
+  const handleOpenOrderDialog = (item) => {
+    if (!item.isActive) return
+    setSelectedItem(item)
+    setOrderQuantity(1)
+    setOrderRemarks("")
+    setShowOrderDialog(true)
+  }
+
+  // Replace the handleConfirmOrder function with handleAddToCart that adds items to the pending cart instead of immediately placing orders:
+  const handleAddToCart = async () => {
+    if (!selectedItem) return
+
+    try {
+      setOrderingItem(selectedItem.id)
+
+      const employeeId =
+        isAdmin && orderContext === "employee"
+          ? selectedEmployeeId
+          : employee?.employeeId || (isAdmin ? admin?.employeeId : null)
+
+      if (!employeeId) {
+        throw new Error("Employee ID not available")
+      }
+
+      // Create cart item instead of placing order immediately
+      const cartItem = {
+        id: Date.now(), // Temporary ID for cart item
+        menuId: selectedItem.menuId,
+        itemName: selectedItem.name,
+        category: selectedItem.category,
+        priceAtOrder: selectedItem.price,
+        quantity: orderQuantity,
+        totalPrice: selectedItem.price * orderQuantity,
+        remarks:` ${orderRemarks} ${isAdmin ? `Ordered by admin for ${orderContext === "employee" ? "employee " + selectedEmployeeId : "self"}` : ""}`,
+        employeeId,
+        status: "CART", // Special status for cart items
+        expectedDeliveryDate: new Date().toISOString().split("T")[0],
+      }
+
+      setPendingCartItems((prev) => [...prev, cartItem])
+
+      setOrderSuccessData({
+        itemName: selectedItem.name,
+        orderId: `CART-${Date.now()}`,
+        quantity: orderQuantity,
+        price: selectedItem.price,
+        totalPrice: selectedItem.price * orderQuantity,
+        forEmployee: isAdmin && orderContext === "employee" ? selectedEmployeeId : null,
+      })
+
+      setShowOrderSuccess(true)
+      setShowOrderDialog(false)
+    } catch (err) {
+      alert(`Failed to add to cart: ${err.message}`)
+    } finally {
+      setOrderingItem(null)
+    }
+  }
+
+  // Add a new function to place all cart items as orders:
+  const handlePlaceAllOrders = async () => {
+    if (pendingCartItems.length === 0) return
+
+    try {
+      setCartLoading(true)
+      const orderPromises = pendingCartItems.map((item) =>
+        api.post("/api/orders", {
+          employeeId: item.employeeId,
+          menuId: item.menuId,
+          quantity: item.quantity,
+          expectedDeliveryDate: item.expectedDeliveryDate,
+          remarks: item.remarks,
+        }),
+      )
+
+      await Promise.all(orderPromises)
+
+      // Clear pending cart and refresh actual orders
+      setPendingCartItems([])
+      await loadCartItems()
+
+      alert(`Successfully placed ${pendingCartItems.length} orders!`)
+      setShowCart(false)
+    } catch (err) {
+      alert(`Failed to place orders: ${err.response?.data?.message || err.message}`)
+    } finally {
+      setCartLoading(false)
+    }
+  }
+
+  // Add function to remove items from pending cart:
+  const handleRemoveFromCart = (cartItemId) => {
+    setPendingCartItems((prev) => prev.filter((item) => item.id !== cartItemId))
+  }
+
+  // Handle canceling order from cart
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return
+
+    try {
+      await api.delete(`/api/orders/${orderId}`)
+      loadCartItems() // Refresh cart
+    } catch (err) {
+      alert(`Failed to cancel order: ${err.response?.data?.message || err.message}`)
+    }
+  }
+
+  // Get icon for category
+  const getCategoryIcon = (category) => {
+    switch (category.toLowerCase()) {
+      case "breakfast":
+        return <Coffee className="w-6 h-6 text-orange-600" />
+      case "lunch":
+        return <Utensils className="w-6 h-6 text-green-600" />
+      case "thali":
+        return <ChefHat className="w-6 h-6 text-purple-600" />
+      case "snacks":
+        return <Cookie className="w-6 h-6 text-yellow-600" />
+      case "beverages":
+        return <Wine className="w-6 h-6 text-blue-600" />
+      default:
+        return <Package className="w-6 h-6 text-gray-600" />
+    }
+  }
+
+  // Get day name
+  const getDayName = (day) => {
+    const dayNames = {
+      MONDAY: "Monday",
+      TUESDAY: "Tuesday",
+      WEDNESDAY: "Wednesday",
+      THURSDAY: "Thursday",
+      FRIDAY: "Friday",
+      SATURDAY: "Saturday",
+      SUNDAY: "Sunday",
+    }
+    return dayNames[day] || day
+  }
+
+  // Check if day is current day
+  const isCurrentDay = (day) => {
+    return day === getCurrentDay()
+  }
+
+  // Group items by category
+  const groupedItems = filteredItems.reduce((groups, item) => {
+    const category = item.category
+    if (!groups[category]) groups[category] = []
+    groups[category].push(item)
+    return groups
+  }, {})
+
+  // Define category order
+  const categoryOrder = ["breakfast", "lunch", "thali", "snacks", "beverages"]
+  const sortedCategories = categoryOrder.filter((category) => groupedItems[category]?.length > 0)
+
+  // All days of the week
   const ALL_DAYS = [
     { key: "MONDAY", label: "Mon", fullName: "Monday" },
     { key: "TUESDAY", label: "Tue", fullName: "Tuesday" },
@@ -69,181 +341,26 @@ export default function EmployeeMenu() {
     { key: "SUNDAY", label: "Sun", fullName: "Sunday" },
   ]
 
-  const getCurrentDay = () => {
-    const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
-    return days[new Date().getDay()]
+  // Enhanced Get cart total function
+  const getCartTotal = () => {
+    return cartItems.reduce((total, item) => {
+      const itemPrice = item.priceAtOrder || item.price || 0
+      const itemQuantity = item.quantity || 1
+      const itemTotal = itemPrice * itemQuantity
+      return total + itemTotal
+    }, 0)
   }
 
-  const isCurrentDay = (day) => day === getCurrentDay()
-
-  const getCategoryIcon = (category) => {
-    switch (category?.toLowerCase()) {
-      case "breakfast": return <Coffee className="w-6 h-6 text-orange-600" />
-      case "lunch": return <Utensils className="w-6 h-6 text-green-600" />
-      case "thali": return <ChefHat className="w-6 h-6 text-purple-600" />
-      case "snacks": return <Cookie className="w-6 h-6 text-yellow-600" />
-      case "beverages": return <Wine className="w-6 h-6 text-blue-600" />
-      default: return <Package className="w-6 h-6 text-gray-600" />
-    }
+  // Update the cart notification text function to include pending items:
+  const getCartNotificationText = () => {
+    const totalCount = pendingCartItems.length + cartItems.length
+    if (totalCount === 0) return "View Cart"
+    if (totalCount === 1) return "1 item in cart"
+    return `${totalCount} items in cart`
   }
 
-  const loadMenuItems = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      setSearchMode(false)
-
-      const response = await employeeMenuApi.getWeeklyMenu(selectedDay, filters.category)
-      const items = response.data?.map(item => item.menuItem) || []
-      setMenuItems(items)
-      
-      // Group by category
-      const grouped = items.reduce((groups, item) => {
-        const category = item.category || 'Other'
-        if (!groups[category]) groups[category] = []
-        groups[category].push(item)
-        return groups
-      }, {})
-      
-      setFilteredItems(grouped)
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load menu items")
-      console.error("API Error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      loadMenuItems()
-      return
-    }
-
-    try {
-      setLoading(true)
-      setSearchMode(true)
-      
-      const response = await menuApi.getActiveItems()
-      
-      // Get unique items by name
-      const uniqueItems = response.data.reduce((acc, item) => {
-        if (!acc.some(i => i.name === item.name)) acc.push(item)
-        return acc
-      }, [])
-
-      // Filter by search and active status
-      const filtered = uniqueItems.filter(item => 
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.description?.toLowerCase().includes(searchQuery.toLowerCase()))
-      ).filter(item => item.isActive)
-
-      // Group by category
-      const grouped = filtered.reduce((groups, item) => {
-        const category = item.category || 'Other'
-        if (!groups[category]) groups[category] = []
-        groups[category].push(item)
-        return groups
-      }, {})
-
-      setFilteredItems(grouped)
-    } catch (err) {
-      setError(err.response?.data?.message || "Search failed")
-      console.error("Search Error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadCartItems = async () => {
-    try {
-      setCartLoading(true)
-      const employeeId = isAdmin && orderContext === "employee" 
-        ? selectedEmployeeId 
-        : employee?.employeeId
-
-      if (!employeeId) {
-        setCartItems([])
-        return
-      }
-
-      const response = await api.get(`/api/orders/pending/${employeeId}`)
-      setCartItems(response.data?.map(item => ({
-        ...item,
-        itemName: item.itemName || item.name || "Unknown Item",
-        priceAtOrder: Number(item.priceAtOrder || item.price || 0),
-        quantity: Number(item.quantity || 1),
-        totalPrice: Number(item.priceAtOrder || item.price || 0) * Number(item.quantity || 1),
-        status: item.status || "PENDING",
-        category: item.category || "general",
-      })) || [])
-    } catch (err) {
-      console.error("Failed to load cart items:", err)
-      setCartItems([])
-    } finally {
-      setCartLoading(false)
-    }
-  }
-
-  const handleConfirmOrder = async () => {
-    if (!selectedItem) return
-
-    try {
-      setOrderingItem(selectedItem.id)
-      const employeeId = isAdmin && orderContext === "employee" 
-        ? selectedEmployeeId 
-        : employee?.employeeId
-
-      if (!employeeId) throw new Error("Employee ID not available")
-
-      const response = await api.post("/api/orders", {
-        employeeId,
-        menuId: selectedItem.menuId,
-        quantity: orderQuantity,
-        expectedDeliveryDate: new Date().toISOString().split("T")[0],
-        remarks: orderRemarks
-      })
-
-      setOrderSuccessData({
-        itemName: selectedItem.name,
-        orderId: response.data.id,
-        quantity: orderQuantity,
-        price: selectedItem.price,
-        totalPrice: selectedItem.price * orderQuantity,
-        forEmployee: isAdmin && orderContext === "employee" ? selectedEmployeeId : null,
-      })
-
-      setShowOrderSuccess(true)
-      setShowOrderDialog(false)
-      loadCartItems()
-    } catch (err) {
-      alert(`Failed to place order: ${err.response?.data?.message || err.message}`)
-    } finally {
-      setOrderingItem(null)
-    }
-  }
-
-  const handleCancelOrder = async (orderId) => {
-    if (!window.confirm("Are you sure you want to cancel this order?")) return
-    try {
-      await api.delete(`/api/orders/${orderId}`)
-      loadCartItems()
-    } catch (err) {
-      alert(`Failed to cancel order: ${err.response?.data?.message || err.message}`)
-    }
-  }
-
-  useEffect(() => {
-    loadMenuItems()
-    loadCartItems()
-  }, [selectedDay, filters.category])
-
-  useEffect(() => {
-    if (searchQuery.trim() === "" && searchMode) {
-      setSearchMode(false)
-      loadMenuItems()
-    }
-  }, [searchQuery])
+  // Update the cart display logic to show both pending cart items and placed orders:
+  const allCartItems = [...pendingCartItems, ...cartItems]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -260,93 +377,78 @@ export default function EmployeeMenu() {
                 <p className="text-gray-600 text-lg">Delicious meals, delivered fresh</p>
               </div>
             </div>
-            
-            {/* Admin Controls */}
-            {isAdmin && (
-              <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={orderContext === "self"}
-                      onChange={() => setOrderContext("self")}
-                      className="mr-2 w-4 h-4 text-blue-500"
-                    />
-                    <span className="text-gray-700 font-medium text-sm">Order to me</span>
-                  </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={orderContext === "employee"}
-                      onChange={() => {
-                        setOrderContext("employee")
-                        setSelectedEmployeeId("")
-                      }}
-                      className="mr-2 w-4 h-4 text-blue-500"
-                    />
-                    <span className="text-gray-700 font-medium text-sm">Order for others</span>
-                  </label>
-                </div>
-                {orderContext === "employee" && (
-                  <div className="mt-3">
-                    <input
-                      type="text"
-                      value={selectedEmployeeId}
-                      onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-                      placeholder="Enter employee ID"
-                    />
+            <div className="flex items-center gap-4">
+              {/* Admin Controls */}
+              {isAdmin && (
+                <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={orderContext === "self"}
+                        onChange={() => setOrderContext("self")}
+                        className="mr-2 w-4 h-4 text-blue-500"
+                      />
+                      <span className="text-gray-700 font-medium text-sm">Order to me</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={orderContext === "employee"}
+                        onChange={() => {
+                          setOrderContext("employee")
+                          setSelectedEmployeeId("")
+                        }}
+                        className="mr-2 w-4 h-4 text-blue-500"
+                      />
+                      <span className="text-gray-700 font-medium text-sm">Order for others</span>
+                    </label>
                   </div>
-                )}
-              </div>
-            )}
-            
-            {/* Cart Button */}
-            <button
-              onClick={() => setShowCart(true)}
-              className="relative bg-blue-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg hover:shadow-xl"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {cartItems.length > 0 ? (
-                <>
-                  {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
-                  <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                    {cartItems.length}
-                  </span>
-                </>
-              ) : (
-                "View Cart"
+                  {orderContext === "employee" && (
+                    <div className="mt-3">
+                      <input
+                        type="text"
+                        value={selectedEmployeeId}
+                        onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                        placeholder="Enter employee ID"
+                      />
+                    </div>
+                  )}
+                </div>
               )}
-            </button>
+
+              <button
+                onClick={() => setShowCart(true)}
+                className="relative bg-blue-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg hover:shadow-xl"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {getCartNotificationText()}
+                {/* Update the cart badge count to show total items: */}
+                {pendingCartItems.length + cartItems.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                    {pendingCartItems.length + cartItems.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Search and Filters */}
+        {/* Search and Filters Bar */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search Input */}
+            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search menu items..."
+                placeholder="Search delicious food..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
               />
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery("")
-                    setSearchMode(false)
-                    loadMenuItems()
-                  }}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
             </div>
 
             {/* Category Filter */}
@@ -354,15 +456,15 @@ export default function EmployeeMenu() {
               <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <select
                 value={filters.category}
-                onChange={(e) => setFilters({...filters, category: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, category: e.target.value })}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white"
               >
                 <option value="all">All Categories</option>
-                <option value="breakfast">Breakfast</option>
-                <option value="lunch">Lunch</option>
-                <option value="thali">Thali</option>
-                <option value="snacks">Snacks</option>
-                <option value="beverages">Beverages</option>
+                <option value="breakfast">🌅 Breakfast</option>
+                <option value="lunch">🍽️ Lunch</option>
+                <option value="thali">🍛 Thali</option>
+                <option value="snacks">🍿 Snacks</option>
+                <option value="beverages">🥤 Beverages</option>
               </select>
             </div>
 
@@ -371,41 +473,52 @@ export default function EmployeeMenu() {
               <CheckCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <select
                 value={filters.status}
-                onChange={(e) => setFilters({...filters, status: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white"
               >
-                <option value="active">Available Only</option>
-                <option value="all">All Items</option>
+                <option value="active">✅ Available Only</option>
+                <option value="all">📋 All Items</option>
+                <option value="inactive">❌ Unavailable Only</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Day Navigation */}
-        <div className="mb-6">
-          <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-2">
-            <div className="flex">
-              {ALL_DAYS.map((day) => (
-                <button
-                  key={day.key}
-                  onClick={() => setSelectedDay(day.key)}
-                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
-                    selectedDay === day.key
-                      ? "bg-blue-500 text-white shadow-lg"
-                      : "text-gray-700 hover:text-blue-500 hover:bg-blue-50"
-                  }`}
-                >
-                  <div className="flex items-center justify-center">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    {day.label}
-                  </div>
-                </button>
-              ))}
+        {/* Weekday Navigation Bar */}
+        <div className="mb-8">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-center gap-2">
+              <Calendar className="w-5 h-5 text-gray-500 mr-2" />
+              {ALL_DAYS.map((day) => {
+                const isCurrent = isCurrentDay(day.key)
+                const isSelected = selectedDay === day.key
+                const canOrder = isCurrent
+
+                return (
+                 <button
+  key={day.key}
+  onClick={() => setSelectedDay(day.key)}
+  className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+    isSelected && canOrder
+      ? "bg-blue-500 text-white shadow-lg transform scale-105"
+      : canOrder
+        ? "text-blue-600 hover:bg-blue-50 border border-blue-200"
+        : "text-gray-500 bg-gray-200 cursor-not-allowed"
+  }`}
+  title={canOrder ? `Order for ${day.fullName}` : `Cannot order for ${day.fullName}`}
+>
+  <div className="flex flex-col items-center">
+    <span>{day.label}</span>
+    <span className="text-xs mt-1">{day.fullName}</span>
+    {isCurrent && <div className="w-2 h-2 bg-blue-400 rounded-full mt-1"></div>}
+  </div>
+</button>
+                )
+              })}
             </div>
           </div>
         </div>
 
-        {/* Current Day Notice */}
         {!isCurrentDay(selectedDay) && (
           <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
             <div className="flex">
@@ -414,15 +527,15 @@ export default function EmployeeMenu() {
               </div>
               <div className="ml-3">
                 <p className="text-sm text-yellow-700">
-                  <strong>View Only Mode:</strong> You can only place orders for today ({getCurrentDay()}).
-                  You're currently viewing the menu for {selectedDay}.
+                  <strong>View Only Mode:</strong> You can only place orders for today ({getDayName(getCurrentDay())}).
+                  You're currently viewing the menu for {getDayName(selectedDay)}.
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Error Display */}
+        {/* Error State */}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6">
             <div className="flex items-center">
@@ -442,189 +555,144 @@ export default function EmployeeMenu() {
           </div>
         )}
 
-        {/* Search Results */}
-        {searchMode && !loading && (
-          <div className="bg-white rounded-xl shadow-lg mt-4 max-h-[70vh] overflow-y-auto">
-            {/* Search Header */}
-            <div className="sticky top-0 bg-white p-4 border-b z-10 flex justify-between items-center">
-              <h3 className="font-bold text-lg flex items-center">
-                <Search className="mr-2 w-5 h-5" />
-                Search Results for "{searchQuery}"
-              </h3>
-              <button 
-                onClick={() => {
-                  setSearchMode(false)
-                  setSearchQuery("")
-                  loadMenuItems()
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Search Results Content */}
-            {Object.keys(filteredItems).length > 0 ? (
-              Object.entries(filteredItems).map(([category, items]) => (
-                <div key={category} className="p-4 border-b last:border-b-0">
-                  <div className="flex items-center mb-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center mr-3">
-                      {getCategoryIcon(category)}
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800 capitalize">{category}</h3>
-                    <span className="ml-auto bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">
-                      {items.length} {items.length === 1 ? 'item' : 'items'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {items.map(item => (
-                      <div 
-                        key={item.id} 
-                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
-                      >
-                        <div className="flex">
-                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg mr-4">
-                            {getCategoryIcon(item.category)}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-bold text-gray-900">{item.name}</h4>
-                            <p className="text-sm text-gray-500 line-clamp-2 mt-1">
-                              {item.description || "No description available"}
-                            </p>
-                            <div className="mt-3 flex items-center justify-between">
-                              <span className="font-bold text-blue-600">₹{item.price}</span>
-                              <button
-                                onClick={() => {
-                                  setSelectedItem(item)
-                                  setOrderQuantity(1)
-                                  setOrderRemarks("")
-                                  setShowOrderDialog(true)
-                                }}
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm transition-colors"
-                              >
-                                Add to Cart
-                              </button>
-                            </div>
-                          </div>
+        {/* Menu Grid */}
+        {!loading && !error && (
+          <div>
+            {filteredItems.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+                <ChefHat className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-xl font-medium text-gray-900 mb-2">No items found</h3>
+                <p className="text-gray-500">
+                  {`searchQuery
+                    ? No items match "${searchQuery}"
+                    : No menu items available for ${getDayName(selectedDay)}`}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {sortedCategories.map((category) => (
+                  <div key={category} className="bg-white rounded-xl shadow-lg overflow-hidden">
+                    {/* Category Header */}
+                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {getCategoryIcon(category)}
+                          <h3 className="ml-3 text-2xl font-bold text-gray-900 capitalize">{category}</h3>
+                          <span className="ml-3 bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+                            {groupedItems[category].length} items
+                          </span>
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Category Items Table */}
+                    <div className="p-6">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Item
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Description
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Quantity
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Price
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Status
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Action
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {groupedItems[category].map((item) => (
+                              <tr key={item.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="flex-shrink-0 h-10 w-10">
+                                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-teal-50 to-blue-50 flex items-center justify-center">
+                                        {getCategoryIcon(item.category)}
+                                      </div>
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-900">
+                                    {item.description || "No description available"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">
+                                    {item.quantity} {item.unit}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-bold text-blue-600">₹{item.price}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span
+                                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      item.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                                    }`}
+                                  >
+                                    {item.isActive ? "Available" : "Unavailable"}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <button
+                                    onClick={() => handleOpenOrderDialog(item)}
+                                    disabled={!item.isActive || !isCurrentDay(selectedDay)}
+                                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                                      item.isActive && isCurrentDay(selectedDay)
+                                        ? "bg-blue-500 text-white hover:bg-blue-600"
+                                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                    }`}
+                                  >
+                                    {!isCurrentDay(selectedDay)
+                                      ? "View Only"
+                                      : item.isActive
+                                        ? "Add to Cart"
+                                        : "Unavailable"}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-8 text-center">
-                <Search className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                <h4 className="text-lg font-medium text-gray-900">No items found</h4>
-                <p className="text-gray-500">Try a different search term</p>
+                ))}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Weekly Menu Display (when not in search mode) */}
-        {!searchMode && !loading && !error && Object.keys(filteredItems).length > 0 && (
-          <div className="space-y-8">
-            {Object.entries(filteredItems).map(([category, items]) => (
-              <div key={category} className="bg-white rounded-xl shadow-lg overflow-hidden">
-                {/* Category Header */}
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-                  <div className="flex items-center">
-                    {getCategoryIcon(category)}
-                    <h3 className="ml-3 text-2xl font-bold text-gray-900 capitalize">{category}</h3>
-                    <span className="ml-auto bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
-                      {items.length} items
-                    </span>
-                  </div>
-                </div>
-
-                {/* Items Table */}
-                <div className="p-6">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {items.map(item => (
-                          <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="flex-shrink-0 h-10 w-10">
-                                  {getCategoryIcon(item.category)}
-                                </div>
-                                <div className="ml-4">
-                                  <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900">
-                                {item.description || "No description available"}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                                {item.quantity} {item.unit}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-bold text-blue-600">₹{item.price}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                item.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                              }`}>
-                                {item.isActive ? "Available" : "Unavailable"}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <button
-                                onClick={() => {
-                                  setSelectedItem(item)
-                                  setOrderQuantity(1)
-                                  setOrderRemarks("")
-                                  setShowOrderDialog(true)
-                                }}
-                                disabled={!item.isActive || !isCurrentDay(selectedDay)}
-                                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                                  item.isActive && isCurrentDay(selectedDay)
-                                    ? "bg-blue-500 text-white hover:bg-blue-600"
-                                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                }`}
-                              >
-                                {!isCurrentDay(selectedDay)
-                                  ? "View Only"
-                                  : item.isActive
-                                    ? "Add to Cart"
-                                    : "Unavailable"}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && !error && Object.keys(filteredItems).length === 0 && !searchMode && (
-          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-            <ChefHat className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-            <h3 className="text-xl font-medium text-gray-900 mb-2">No items available</h3>
-            <p className="text-gray-500">No menu items found for {selectedDay}</p>
           </div>
         )}
 
@@ -642,6 +710,7 @@ export default function EmployeeMenu() {
                 </button>
               </div>
 
+              {/* Item Details */}
               <div className="mb-6">
                 <div className="flex items-center mb-4">
                   <div className="w-16 h-16 bg-gradient-to-br from-teal-50 to-blue-50 rounded-lg flex items-center justify-center mr-4">
@@ -655,6 +724,7 @@ export default function EmployeeMenu() {
                 {selectedItem.description && <p className="text-gray-600 text-sm">{selectedItem.description}</p>}
               </div>
 
+              {/* Quantity Selector */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
                 <div className="flex items-center justify-center space-x-4">
@@ -674,6 +744,7 @@ export default function EmployeeMenu() {
                 </div>
               </div>
 
+              {/* Special Instructions */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Special Instructions (Optional)</label>
                 <textarea
@@ -685,6 +756,7 @@ export default function EmployeeMenu() {
                 />
               </div>
 
+              {/* Total and Actions */}
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-lg font-medium text-gray-700">Total:</span>
@@ -696,14 +768,14 @@ export default function EmployeeMenu() {
                 <div className="flex space-x-3">
                   <button
                     onClick={() => setShowOrderDialog(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={handleConfirmOrder}
+                    onClick={handleAddToCart}
                     disabled={orderingItem === selectedItem.id}
-                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
                     {orderingItem === selectedItem.id ? (
                       <>
@@ -723,23 +795,29 @@ export default function EmployeeMenu() {
           </div>
         )}
 
-        {/* Cart Sidebar */}
+        {/* Enhanced Cart Sidebar with Full ViewCart Functionality */}
         {showCart && (
           <div className="fixed inset-0 z-50 overflow-hidden">
             <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowCart(false)} />
             <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl">
               <div className="flex flex-col h-full">
+                {/* Enhanced Cart Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
                   <div>
                     <h3 className="text-2xl font-bold text-gray-900 flex items-center">
                       <ShoppingCart className="w-6 h-6 mr-2 text-blue-500" />
                       Your Cart
                     </h3>
-                    {cartItems.length > 0 && (
+                    {allCartItems.length > 0 && (
                       <p className="text-sm text-gray-500 mt-1">
-                        {cartItems.reduce((sum, item) => sum + item.quantity, 0)} item
-                        {cartItems.reduce((sum, item) => sum + item.quantity, 0) !== 1 ? 's' : ''} • ₹
-                        {cartItems.reduce((sum, item) => sum + (item.priceAtOrder * item.quantity), 0).toFixed(2)}
+                        {allCartItems.reduce((sum, item) => sum + item.quantity, 0)} item
+                        {allCartItems.reduce((sum, item) => sum + item.quantity, 0) !== 1 ? "s" : ""} • ₹
+                        {allCartItems
+                          .reduce(
+                            (total, item) => total + (item.priceAtOrder || item.price || 0) * (item.quantity || 1),
+                            0,
+                          )
+                          .toFixed(2)}
                       </p>
                     )}
                   </div>
@@ -751,71 +829,312 @@ export default function EmployeeMenu() {
                   </button>
                 </div>
 
+                {/* Enhanced Cart Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                   {cartLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader className="animate-spin h-8 w-8 text-blue-500" />
                       <span className="ml-2 text-gray-600">Loading cart...</span>
                     </div>
-                  ) : cartItems.length === 0 ? (
+                  ) : allCartItems.length === 0 ? (
                     <div className="text-center py-12">
                       <ShoppingCart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <h4 className="text-lg font-medium text-gray-900 mb-2">Your cart is empty</h4>
                       <p className="text-gray-500">Add some delicious items to get started!</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {cartItems.map(item => (
-                        <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-start">
-                            <div className="mr-4">
-                              {getCategoryIcon(item.category)}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex justify-between">
-                                <h4 className="font-medium text-gray-900">{item.itemName}</h4>
-                                <span className="font-bold text-blue-600">₹{(item.priceAtOrder * item.quantity).toFixed(2)}</span>
-                              </div>
-                              <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
-                              {item.remarks && (
-                                <p className="text-xs text-gray-500 mt-1">Note: {item.remarks}</p>
-                              )}
-                            </div>
+                    <div className="space-y-6">
+                      {/* Admin Context Info */}
+                      {isAdmin && (
+  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+    <div className="flex items-center">
+      <CheckCircle className="w-4 h-4 text-blue-500 mr-2" />
+      <span className="text-sm text-blue-800 font-medium">
+        {orderContext === "employee" && selectedEmployeeId
+          ? `Cart for employee: ${selectedEmployeeId}`
+          : "Your cart"}
+      </span>
+    </div>
+  </div>
+)}
+
+                      {/* Cart Items Table - Enhanced */}
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-900">Order Details</h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th
+                                  scope="col"
+                                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Item Name
+                                </th>
+                                <th
+                                  scope="col"
+                                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Price
+                                </th>
+                                <th
+                                  scope="col"
+                                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Quantity
+                                </th>
+                                <th
+                                  scope="col"
+                                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Total Price
+                                </th>
+                                <th
+                                  scope="col"
+                                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Status
+                                </th>
+                                <th scope="col" className="relative px-4 py-3">
+                                  <span className="sr-only">Actions</span>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {allCartItems.map((item) => {
+                                const itemTotal = (item.priceAtOrder || item.price || 0) * (item.quantity || 1)
+                                return (
+                                  <tr key={item.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-4">
+                                      <div className="flex items-center">
+                                        <div className="flex-shrink-0 mr-3">{getCategoryIcon(item.category)}</div>
+                                        <div>
+                                          <div className="text-sm font-medium text-gray-900">
+                                            {item.itemName || item.name || "Unknown Item"}
+                                          </div>
+                                          {item.remarks && (
+                                            <div className="text-xs text-gray-500 mt-1">Note: {item.remarks}</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                      ₹{(item.priceAtOrder || item.price || 0).toFixed(2)}
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                        {item.quantity}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
+                                      ₹{itemTotal.toFixed(2)}
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap">
+                                      <span
+                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                          item.status === "PENDING"
+                                            ? "bg-yellow-100 text-yellow-800"
+                                            : item.status === "PREPARING"
+                                              ? "bg-blue-100 text-blue-800"
+                                              : item.status === "READY"
+                                                ? "bg-green-100 text-green-800"
+                                                : item.status === "CART"
+                                                  ? "bg-purple-100 text-purple-800"
+                                                  : "bg-gray-100 text-gray-800"
+                                        }`}
+                                      >
+                                        {item.status === "CART" ? "in cart" : item.status.toLowerCase()}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                      {item.status === "PENDING" && (
+                                        <button
+                                          onClick={() => handleCancelOrder(item.id)}
+                                          className="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
+                                          title="Cancel Order"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                      {item.status === "CART" && (
+                                        <button
+                                          onClick={() => handleRemoveFromCart(item.id)}
+                                          className="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
+                                          title="Remove from Cart"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Enhanced Cart Summary */}
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                          <Package className="w-4 h-4 mr-2 text-blue-600" />
+                          Order Summary
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Items:</span>
+                            <span className="font-medium">
+                              {allCartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                            </span>
                           </div>
-                          <div className="mt-3 flex justify-end">
-                            {item.status === "PENDING" && (
-                              <button
-                                onClick={() => handleCancelOrder(item.id)}
-                                className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center"
-                              >
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Remove
-                              </button>
-                            )}
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Number of Orders:</span>
+                            <span className="font-medium">{cartItems.length}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Subtotal:</span>
+                            <span className="font-medium">
+                              ₹
+                              {cartItems
+                                .reduce((total, item) => {
+                                  const itemPrice = item.priceAtOrder || item.price || 0
+                                  const itemQuantity = item.quantity || 1
+                                  const itemTotal = itemPrice * itemQuantity
+                                  return total + itemTotal
+                                }, 0)
+                                .toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Pending Subtotal:</span>
+                            <span className="font-medium">
+                              ₹
+                              {pendingCartItems
+                                .reduce((total, item) => {
+                                  const itemPrice = item.priceAtOrder || item.price || 0
+                                  const itemQuantity = item.quantity || 1
+                                  const itemTotal = itemPrice * itemQuantity
+                                  return total + itemTotal
+                                }, 0)
+                                .toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="border-t border-blue-200 pt-2 mt-2">
+                            <div className="flex justify-between">
+                              <span className="font-semibold text-gray-900">Total Amount:</span>
+                              <span className="font-bold text-xl text-blue-600">
+                                ₹
+                                {allCartItems
+                                  .reduce((total, item) => {
+                                    const itemPrice = item.priceAtOrder || item.price || 0
+                                    const itemQuantity = item.quantity || 1
+                                    const itemTotal = itemPrice * itemQuantity
+                                    return total + itemTotal
+                                  }, 0)
+                                  .toFixed(2)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Order Status Summary */}
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <h4 className="font-medium text-gray-900 mb-3">Order Status</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          {["PENDING", "PREPARING", "READY", "DELIVERED"].map((status) => {
+                            const count = cartItems.filter((item) => item.status === status).length
+                            const statusColors = {
+                              PENDING: "text-yellow-600 bg-yellow-100",
+                              PREPARING: "text-blue-600 bg-blue-100",
+                              READY: "text-green-600 bg-green-100",
+                              DELIVERED: "text-gray-600 bg-gray-100",
+                            }
+                            return (
+                              <div key={status} className="flex justify-between items-center">
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[status]}`}>
+                                  {status.toLowerCase()}
+                                </span>
+                                <span className="font-medium">{count}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {cartItems.length > 0 && (
+                {/* Enhanced Cart Footer */}
+                {allCartItems.length > 0 && (
                   <div className="border-t border-gray-200 p-6 bg-white">
                     <div className="flex justify-between items-center mb-4">
-                      <span className="text-lg font-semibold text-gray-700">Total:</span>
+                      <div>
+                        <span className="text-lg font-semibold text-gray-700">Grand Total:</span>
+                        <div className="text-sm text-gray-500">
+                          {allCartItems.reduce((sum, item) => sum + item.quantity, 0)} item
+                          {allCartItems.reduce((sum, item) => sum + item.quantity, 0) !== 1 ? "s" : ""} •{" "}
+                          {cartItems.length} order
+                          {cartItems.length !== 1 ? "s" : ""}
+                        </div>
+                      </div>
                       <span className="text-2xl font-bold text-blue-600">
-                        ₹{cartItems.reduce((sum, item) => sum + (item.priceAtOrder * item.quantity), 0).toFixed(2)}
+                        ₹
+                        {allCartItems
+                          .reduce((total, item) => {
+                            const itemPrice = item.priceAtOrder || item.price || 0
+                            const itemQuantity = item.quantity || 1
+                            const itemTotal = itemPrice * itemQuantity
+                            return total + itemTotal
+                          }, 0)
+                          .toFixed(2)}
                       </span>
                     </div>
-                    <button
-                      className="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-all"
-                      onClick={() => {
-                        setShowCart(false)
-                        alert('Order placed successfully!')
-                      }}
-                    >
-                      Proceed to Checkout
-                    </button>
+
+                    <div className="space-y-3">
+                      {pendingCartItems.length > 0 && (
+                        <button
+                          className="w-full bg-green-500 text-white py-3 rounded-lg font-medium hover:bg-green-600 transition-all flex items-center justify-center mb-3"
+                          onClick={handlePlaceAllOrders}
+                          disabled={cartLoading}
+                        >
+                          {cartLoading ? (
+                            <>
+                              <Loader className="animate-spin w-4 h-4 mr-2" />
+                              Placing Orders...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Place {pendingCartItems.length} Order{pendingCartItems.length !== 1 ? "s" : ""} (₹
+                              {pendingCartItems.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2)})
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      <button
+                        className="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-all flex items-center justify-center"
+                        onClick={() => {
+                          // Handle checkout logic here
+                          alert(
+                            `Proceeding to checkout with ${cartItems.length} orders totaling ₹${getCartTotal().toFixed(2)},
+                          `)
+                        }}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Proceed to Checkout (₹{getCartTotal().toFixed(2)})
+                      </button>
+
+                      <button
+                        onClick={() => setShowCart(false)}
+                        className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-200 transition-all"
+                      >
+                        Continue Shopping
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -1,9 +1,28 @@
+
 import { useState } from "react"
-import { ShoppingCart, X, Trash2, CheckCircle, Package, ChefHat, Coffee, Utensils, Cookie, Wine } from "lucide-react"
-import EmployeeMenu from "./EmployeeMenu"
-export default function CartPreview() {
+import {
+  ShoppingCart,
+  X,
+  Trash2,
+  CheckCircle,
+  Package,
+  ChefHat,
+  Coffee,
+  Utensils,
+  Cookie,
+  Wine,
+  Loader,
+} from "lucide-react"
+
+export default function ViewCart({
+  cartItems = [],
+  pendingCartItems = [],
+  onRemoveFromCart,
+  onPlaceAllOrders,
+  onCancelOrder,
+  cartLoading = false,
+}) {
   const [showCart, setShowCart] = useState(true)
-  const [cartItems] = useState([]) // Empty cart - will be populated by employee actions
 
   // Get icon for category
   const getCategoryIcon = (category) => {
@@ -23,24 +42,31 @@ export default function CartPreview() {
     }
   }
 
-  // Get cart total
-  const getCartTotal = () => {
-    return cartItems.reduce((total, item) => total + (item.totalPrice || 0), 0)
-  }
+  const allCartItems = [...pendingCartItems, ...cartItems]
+  const totalItems = allCartItems.reduce((sum, item) => sum + (item.quantity || 0), 0)
+  const totalAmount = allCartItems.reduce((total, item) => {
+    const itemPrice = item.priceAtOrder || item.price || 0
+    const itemQuantity = item.quantity || 1
+    return total + itemPrice * itemQuantity
+  }, 0)
 
   const handleCancelOrder = (orderId) => {
-    // This will be connected to your actual cancel API
-    console.log(`Cancel order ${orderId}`)
+    if (onCancelOrder) {
+      onCancelOrder(orderId)
+    }
+  }
+
+  const handleRemoveFromCart = (cartItemId) => {
+    if (onRemoveFromCart) {
+      onRemoveFromCart(cartItemId)
+    }
   }
 
   if (!showCart) return null
 
-  const totalItems = cartItems.reduce((sum, item) => sum + (item.quantity || 0), 0)
-  const totalAmount = getCartTotal()
-
   return (
     <div className="min-h-screen bg-gray-100 p-4">
-      <div className="max-w-md mx-auto">
+      <div className="max-w-4xl mx-auto">
         {/* Cart Preview */}
         <div className="bg-white shadow-2xl rounded-lg overflow-hidden">
           <div className="flex flex-col h-[600px]">
@@ -67,8 +93,12 @@ export default function CartPreview() {
 
             {/* Cart Content */}
             <div className="flex-1 overflow-y-auto p-6">
-              {cartItems.length === 0 ? (
-                // Empty Cart State
+              {cartLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader className="animate-spin h-8 w-8 text-blue-500" />
+                  <span className="ml-2 text-gray-600">Loading cart...</span>
+                </div>
+              ) : allCartItems.length === 0 ? (
                 <div className="text-center py-12">
                   <ShoppingCart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <h4 className="text-lg font-medium text-gray-900 mb-2">Your cart is empty</h4>
@@ -76,14 +106,6 @@ export default function CartPreview() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Admin Context Info - Will show when admin is ordering */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-blue-500 mr-2" />
-                      <span className="text-sm text-blue-800 font-medium">Your cart</span>
-                    </div>
-                  </div>
-
                   {/* Cart Items Table */}
                   <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                     <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
@@ -114,58 +136,74 @@ export default function CartPreview() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {cartItems.map((item) => (
-                            <tr key={item.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-4">
-                                <div className="flex items-center">
-                                  <div className="flex-shrink-0 mr-3">{getCategoryIcon(item.category)}</div>
-                                  <div>
-                                    <div className="text-sm font-medium text-gray-900">{item.itemName}</div>
-                                    {item.remarks && (
-                                      <div className="text-xs text-gray-500 mt-1">Note: {item.remarks}</div>
-                                    )}
+                          {allCartItems.map((item) => {
+                            const itemTotal = (item.priceAtOrder || item.price || 0) * (item.quantity || 1)
+                            return (
+                              <tr key={item.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-4">
+                                  <div className="flex items-center">
+                                    <div className="flex-shrink-0 mr-3">{getCategoryIcon(item.category)}</div>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {item.itemName || item.name || "Unknown Item"}
+                                      </div>
+                                      {item.remarks && (
+                                        <div className="text-xs text-gray-500 mt-1">Note: {item.remarks}</div>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                ₹{(item.priceAtOrder || 0).toFixed(2)}
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                                  {item.quantity || 0}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
-                                ₹{(item.totalPrice || 0).toFixed(2)}
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    item.status === "PENDING"
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : item.status === "PREPARING"
-                                        ? "bg-blue-100 text-blue-800"
-                                        : item.status === "READY"
-                                          ? "bg-green-100 text-green-800"
-                                          : "bg-gray-100 text-gray-800"
-                                  }`}
-                                >
-                                  {(item.status || "pending").toLowerCase()}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                {item.status === "PENDING" && (
-                                  <button
-                                    onClick={() => handleCancelOrder(item.id)}
-                                    className="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
-                                    title="Cancel Order"
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  ₹{(item.priceAtOrder || item.price || 0).toFixed(2)}
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                    {item.quantity || 0}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
+                                  ₹{itemTotal.toFixed(2)}
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap">
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      item.status === "PENDING"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : item.status === "PREPARING"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : item.status === "READY"
+                                            ? "bg-green-100 text-green-800"
+                                            : item.status === "CART"
+                                              ? "bg-purple-100 text-purple-800"
+                                              : "bg-gray-100 text-gray-800"
+                                    }`}
                                   >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                                    {item.status === "CART" ? "in cart" : (item.status || "pending").toLowerCase()}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  {item.status === "PENDING" && (
+                                    <button
+                                      onClick={() => handleCancelOrder(item.id)}
+                                      className="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
+                                      title="Cancel Order"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {item.status === "CART" && (
+                                    <button
+                                      onClick={() => handleRemoveFromCart(item.id)}
+                                      className="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
+                                      title="Remove from Cart"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -183,12 +221,12 @@ export default function CartPreview() {
                         <span className="font-medium">{totalItems}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Number of Orders:</span>
+                        <span className="text-gray-600">Placed Orders:</span>
                         <span className="font-medium">{cartItems.length}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Subtotal:</span>
-                        <span className="font-medium">₹{totalAmount.toFixed(2)}</span>
+                        <span className="text-gray-600">Pending in Cart:</span>
+                        <span className="font-medium">{pendingCartItems.length}</span>
                       </div>
                       <div className="border-t border-blue-200 pt-2 mt-2">
                         <div className="flex justify-between">
@@ -198,36 +236,12 @@ export default function CartPreview() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Order Status Summary */}
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-medium text-gray-900 mb-3">Order Status</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      {["PENDING", "PREPARING", "READY", "DELIVERED"].map((status) => {
-                        const count = cartItems.filter((item) => item.status === status).length
-                        const statusColors = {
-                          PENDING: "text-yellow-600 bg-yellow-100",
-                          PREPARING: "text-blue-600 bg-blue-100",
-                          READY: "text-green-600 bg-green-100",
-                          DELIVERED: "text-gray-600 bg-gray-100",
-                        }
-                        return (
-                          <div key={status} className="flex justify-between items-center">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[status]}`}>
-                              {status.toLowerCase()}
-                            </span>
-                            <span className="font-medium">{count}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
 
             {/* Cart Footer - Only shows when cart has items */}
-            {cartItems.length > 0 && (
+            {allCartItems.length > 0 && (
               <div className="border-t border-gray-200 p-6 bg-white">
                 <div className="flex justify-between items-center mb-4">
                   <div>
@@ -240,13 +254,26 @@ export default function CartPreview() {
                 </div>
 
                 <div className="space-y-3">
-                  <button
-                    className="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-all flex items-center justify-center"
-                    onClick={() => console.log(`Proceeding to checkout with ₹${totalAmount.toFixed(2)}`)}
-                  >
-                    <ShoppingCart className="w-4 h-4 mr-2" />
-                    Proceed to Checkout (₹{totalAmount.toFixed(2)})
-                  </button>
+                  {pendingCartItems.length > 0 && (
+                    <button
+                      className="w-full bg-green-500 text-white py-3 rounded-lg font-medium hover:bg-green-600 transition-all flex items-center justify-center"
+                      onClick={onPlaceAllOrders}
+                      disabled={cartLoading}
+                    >
+                      {cartLoading ? (
+                        <>
+                          <Loader className="animate-spin w-4 h-4 mr-2" />
+                          Placing Orders...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Place {pendingCartItems.length} Order{pendingCartItems.length !== 1 ? "s" : ""} (₹
+                          {pendingCartItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toFixed(2)})
+                        </>
+                      )}
+                    </button>
+                  )}
 
                   <button
                     onClick={() => setShowCart(false)}
@@ -268,8 +295,8 @@ export default function CartPreview() {
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-700">
-                <strong>Ready for Employee Orders:</strong> Cart is empty and ready to receive items when employees add
-                them from the menu.
+                <strong>Cart Management:</strong> Review your items and place orders when ready. Items in cart are not
+                yet ordered.
               </p>
             </div>
           </div>
