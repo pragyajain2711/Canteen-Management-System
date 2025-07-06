@@ -31,6 +31,7 @@ export default function AdminDashboard() {
     if (path.includes('/transactions')) return 'transactions';
     if (path.includes('/payments')) return 'payments';
     if (path.includes('/customers')) return 'customers';
+    if (path.includes('/fastordering')) return 'fast-ordering';
     return 'dashboard';
   };
 
@@ -82,6 +83,14 @@ export default function AdminDashboard() {
       label: "OrderHistory",
       path: "/admin-dashboard/orders/history",
       section: "orders-history",
+      
+        
+    },
+    {
+      icon: <ClipboardList size={20} />,
+      label: "Counter Ordering",
+      path: "/admin-dashboard/fastordering",
+      section: "fast-ordering",
       
         
     },
@@ -218,6 +227,7 @@ export default function AdminDashboard() {
             {activeSection === "weekly-menu" && "Weekly Menu Management"}
             {activeSection === "orders" && "Order Management"}
             {activeSection === "transactions" && "Transaction Management"}
+            
             {activeSection === "payments" && "Payment Management"}
             {activeSection === "customers" && "Customer Management"}
           </h2>

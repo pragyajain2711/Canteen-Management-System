@@ -23,6 +23,7 @@ import CanteenHomePage from "./components/CanteenHomePage";
 import EmployeeOrders from "./components/EmployeeOrders";
 import AdminTransactionManagement from "./components/Admin/AdminTransactionManagement";
 import EmployeeBillPayment from "./components/EmployeeBillPayment";
+import FastOrdering from "./components/Admin/FastOrdering";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -80,6 +81,8 @@ function App() {
                 <Route path="orders" element={<AdminOrderManagement />} />
                 <Route path="orders/history" element={<AdminOrderHistory />} />
                 <Route path="transactions" element={<AdminTransactionManagement />} />
+                <Route path="fastordering" element={<FastOrdering />} />
+
                 <Route path="payments" element={<div className="p-6">Payment Management - Coming Soon</div>} />
               </Route>
 
