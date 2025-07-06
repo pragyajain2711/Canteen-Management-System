@@ -10,11 +10,19 @@ public class OrderRequest {
     private Integer quantity;
     private String remarks;
     private LocalDate expectedDeliveryDate;
-
+private String status;
     
     
 
-    // Getters and Setters
+    public String getStatus() {
+	return status;
+}
+
+public void setStatus(String status) {
+	this.status = status;
+}
+
+	// Getters and Setters
     public String getEmployeeId() {
         return employeeId;
     }
@@ -54,6 +62,8 @@ public class OrderRequest {
     public void setExpectedDeliveryDate(LocalDate expectedDeliveryDate) {
         this.expectedDeliveryDate = expectedDeliveryDate;
     }
+
+	
     
 
 }

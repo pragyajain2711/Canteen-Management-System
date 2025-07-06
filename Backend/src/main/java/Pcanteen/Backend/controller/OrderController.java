@@ -11,6 +11,8 @@ import Pcanteen.Backend.repository.*;
 import Pcanteen.Backend.EmployeeRepository;
 import Pcanteen.Backend.model.MenuItem;
 import Pcanteen.Backend.service.OrderService;
+import Pcanteen.Backend.service.TransactionService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -30,19 +32,21 @@ public class OrderController {
 	private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
 
     private final OrderService orderService;
+    private final TransactionService transactionService;
     private final EmployeeRepository employeeRepository;
     private final MenuItemRepository menuItemRepository;
     @Autowired
     public OrderController(OrderService orderService,
                          EmployeeRepository employeeRepository,
-                         MenuItemRepository menuItemRepository) {
+                         MenuItemRepository menuItemRepository,TransactionService transactionService) {
         this.orderService = orderService;
         this.employeeRepository = employeeRepository;
         this.menuItemRepository = menuItemRepository;
+        this.transactionService= transactionService;
     }
 
 
-    @PostMapping
+  /*  @PostMapping
     public ResponseEntity<Order> placeOrder(
             @RequestBody OrderRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -64,7 +68,37 @@ public class OrderController {
         
         Order savedOrder = orderService.placeOrder(order, userDetails.getUsername());
         return ResponseEntity.ok(savedOrder);
+    }*/
+    
+    @PostMapping
+    public ResponseEntity<Order> placeOrder(
+            @RequestBody OrderRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        Employee employee = employeeRepository.findByEmployeeId(request.getEmployeeId())
+            .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+        MenuItem menuItem = menuItemRepository.findByMenuId(request.getMenuId())
+            .orElseThrow(() -> new RuntimeException("Menu item not found"));
+
+        Order order = new Order();
+        order.setEmployee(employee);
+        order.setMenuItem(menuItem);
+        order.setQuantity(request.getQuantity());
+        order.setRemarks(request.getRemarks());
+        order.setExpectedDeliveryDate(request.getExpectedDeliveryDate());
+        order.setStatus(request.getStatus());
+
+        Order savedOrder = orderService.placeOrder(order, userDetails.getUsername());
+
+        // ✅ Only for FastOrdering (status=DELIVERED)
+        if ("DELIVERED".equalsIgnoreCase(request.getStatus())) {
+            transactionService.createTransaction(savedOrder, "ACTIVE");
+        }
+
+        return ResponseEntity.ok(savedOrder);
     }
+
     
    @GetMapping("/employee/{employeeId}")
     public ResponseEntity<List<Order>> getEmployeeOrders(

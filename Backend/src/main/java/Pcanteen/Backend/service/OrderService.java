@@ -49,7 +49,7 @@ public class OrderService {
 
 	@Transactional
     public Order placeOrder(Order order, String currentUser) {
-      
+		System.out.println("Received order with status: " + order.getStatus());
     	// Find by business IDs
         Employee employee = employeeRepository.findByEmployeeId(order.getEmployee().getEmployeeId())
             .orElseThrow(() -> new RuntimeException("Employee not found"));
@@ -66,7 +66,11 @@ public class OrderService {
         
         // Set timestamps
         order.setOrderTime(LocalDateTime.now());
-        order.setStatus("PENDING");
+        
+     // Only set PENDING if status wasn't provided or is empty
+        if (order.getStatus() == null || order.getStatus().isEmpty()) {
+            order.setStatus("PENDING");
+        }
         order.setCreatedBy(currentUser);
         
         // Set default delivery date if not provided
@@ -76,6 +80,8 @@ public class OrderService {
         
         return orderRepository.save(order);
     }
+    
+    
 
    public List<Order> getEmployeeOrders(String employeeId) {
         Employee employee = employeeRepository.findByEmployeeId(employeeId)

@@ -28,6 +28,8 @@ public class TransactionService {
         this.modelMapper = modelMapper;
     }
 
+    
+
     @Transactional
     public void createTransactionsForDeliveredOrders() {
         List<Order> deliveredOrders = orderRepository.findByStatus("DELIVERED");
@@ -48,7 +50,7 @@ public class TransactionService {
         }
     }
 
-    private void createTransaction(Order order, String status) {
+    public void createTransaction(Order order, String status) {
         Transaction transaction = new Transaction();
         transaction.setTransactionId("TXN-" + System.currentTimeMillis());
         transaction.setOrder(order);
@@ -61,6 +63,8 @@ public class TransactionService {
         transaction.setCreatedBy("SYSTEM");
         transactionRepository.save(transaction);
     }
+
+   
 
     public List<TransactionDTO> getAllTransactions() {
         return transactionRepository.findAllWithAssociations().stream()
