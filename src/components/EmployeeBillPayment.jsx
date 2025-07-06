@@ -14,7 +14,8 @@ import {
   Bell,
   RefreshCw,
   MessageSquare,
-  Edit3
+  Edit3,
+  FileText
 } from "lucide-react";
 import { transactionApi } from "./api";
 import * as XLSX from 'xlsx';
@@ -35,6 +36,7 @@ export default function EmployeeBillPayment() {
   const [conversation, setConversation] = useState([]);
   const [notification, setNotification] = useState(null);
   const [employeeId, setEmployeeId] = useState("");
+  const [hasGeneratedBill, setHasGeneratedBill] = useState(false);
 
   useEffect(() => {
     const storedEmployeeId = localStorage.getItem("employeeId") || "102";
@@ -44,36 +46,144 @@ export default function EmployeeBillPayment() {
   useEffect(() => {
     if (employeeId) {
       loadData();
+      checkBillGenerated();
     }
   }, [filters.month, filters.year, employeeId]);
 
-  const loadData = async () => {
+const loadData = async () => {
+  try {
+    setLoading(true);
+    const response = await transactionApi.getBillableTransactions(
+      employeeId,
+      filters.month,
+      filters.year
+    );
+
+    // Double filter to ensure only current employee's transactions
+    const filtered = response.data.filter(
+      t => t.employeeBusinessId === employeeId
+    );
+
+    setTransactions(filtered);
+  } catch (error) {
+    console.error("Error loading data:", error);
+    setNotification({
+      type: "error",
+      message: "Failed to load transactions"
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  const checkBillGenerated = async () => {
     try {
-      setLoading(true);
-      const response = await transactionApi.getBillableTransactions(
+      const response = await transactionApi.checkBillGenerated({
         employeeId,
-        filters.month,
-        filters.year
-      );
-      setTransactions(response.data);
-    } catch (error) {
-      console.error("Error loading data:", error);
-      setNotification({
-        type: "error",
-        message: "Failed to load transactions"
+        month: filters.month,
+        year: filters.year
       });
-    } finally {
-      setLoading(false);
+      setHasGeneratedBill(response.data.hasGenerated);
+    } catch (error) {
+      console.error("Error checking bill status:", error);
+      setHasGeneratedBill(false);
     }
   };
 
+
   const exportToExcel = (data, filename) => {
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(blob, filename + ".xlsx");
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+  saveAs(blob, filename + ".xlsx");
+};
+
+
+  const handlePreviewBill = async () => {
+  try {
+    const response = await transactionApi.getGeneratedBill({
+      employeeId,
+      month: filters.month,
+      year: filters.year
+    });
+
+    // Filter to only show relevant transactions
+    const relevantTransactions = response.data.transactions.filter(
+      t => t.employeeBusinessId === employeeId && 
+          (t.status === "ACTIVE" || t.status === "GENERATED" || t.status === "PAID")
+    );
+
+    if (!relevantTransactions.length) {
+      setNotification({
+        type: "warning",
+        message: "No billable transactions found"
+      });
+      return;
+    }
+
+    setBillPreview({
+      transactions: relevantTransactions,
+      totalAmount: relevantTransactions.reduce((sum, t) => sum + t.totalPrice, 0),
+      statusCounts: {
+        active: relevantTransactions.filter(t => t.status === "ACTIVE").length,
+        generated: relevantTransactions.filter(t => t.status === "GENERATED").length,
+        paid: relevantTransactions.filter(t => t.status === "PAID").length
+      }
+    });
+    setShowBillPreview(true);
+  } catch (error) {
+    console.error("Error previewing bill:", error);
+    setNotification({
+      type: "error",
+      message: "Failed to load bill preview"
+    });
+  }
+};
+
+  const handleSendPaymentRequest = async () => {
+    try {
+      // Mark only ACTIVE transactions as MODIFIED when sending payment request
+      const activeTransactions = transactions.filter(t => t.status === "ACTIVE");
+      await Promise.all(
+        activeTransactions.map(t => 
+          transactionApi.updateStatus(t.id, "MODIFIED")
+        )
+      );
+      
+      setNotification({
+        type: "success",
+        message: "Payment request sent to admin successfully!"
+      });
+      setTimeout(() => setNotification(null), 5000);
+      loadData();
+    } catch (error) {
+      setNotification({
+        type: "error",
+        message: "Failed to send payment request"
+      });
+      console.error("Error sending payment request:", error);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      ACTIVE: { color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle },
+      INACTIVE: { color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
+      MODIFIED: { color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: AlertTriangle },
+    };
+
+    const config = statusConfig[status] || statusConfig.ACTIVE;
+    const Icon = config.icon;
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${config.color}`}>
+        <Icon className="w-3 h-3" />
+        {status}
+      </span>
+    );
   };
 
   const formatDateTime = (dateString) => {
@@ -116,49 +226,6 @@ export default function EmployeeBillPayment() {
     );
   };
 
-  const handlePreviewBill = async () => {
-    try {
-      const response = await transactionApi.generateBill({
-        employeeId,
-        month: filters.month,
-        year: filters.year,
-      });
-      setBillPreview(response.data);
-      setShowBillPreview(true);
-    } catch (error) {
-      console.error("Error previewing bill:", error);
-      setNotification({
-        type: "error",
-        message: "Failed to generate bill preview"
-      });
-    }
-  };
-
-  const handleSendPaymentRequest = async () => {
-    try {
-      // First mark all transactions as MODIFIED
-      await Promise.all(
-        transactions
-          .filter(t => t.status === "ACTIVE")
-          .map(t => transactionApi.updateStatus(t.id, "MODIFIED"))
-      );
-      
-      setNotification({
-        type: "success",
-        message: "Payment request sent to admin successfully!"
-      });
-      setTimeout(() => setNotification(null), 5000);
-      loadData();
-      setShowBillPreview(false);
-    } catch (error) {
-      setNotification({
-        type: "error",
-        message: "Failed to send payment request"
-      });
-      console.error("Error sending payment request:", error);
-    }
-  };
-
   const handleAddRemark = async () => {
     if (!remarkText.trim()) return;
 
@@ -194,24 +261,6 @@ export default function EmployeeBillPayment() {
       .toFixed(2);
   };
 
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      ACTIVE: { color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle },
-      INACTIVE: { color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
-      MODIFIED: { color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: AlertTriangle },
-    };
-
-    const config = statusConfig[status] || statusConfig.ACTIVE;
-    const Icon = config.icon;
-
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${config.color}`}>
-        <Icon className="w-3 h-3" />
-        {status}
-      </span>
-    );
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -235,7 +284,6 @@ export default function EmployeeBillPayment() {
       )}
 
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Monthly Payment</h1>
@@ -243,7 +291,6 @@ export default function EmployeeBillPayment() {
           </div>
         </div>
 
-        {/* Bill Generation Section */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Generate Monthly Bill</h3>
@@ -277,61 +324,55 @@ export default function EmployeeBillPayment() {
               </select>
               <button
                 onClick={handlePreviewBill}
-                className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                disabled={!hasGeneratedBill}
+                className={`flex items-center justify-center px-4 py-2 rounded-md ${
+                  hasGeneratedBill 
+                    ? "bg-blue-600 text-white hover:bg-blue-700" 
+                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                }`}
               >
                 <Preview className="w-4 h-4 mr-2" />
-                Preview Bill
+                {hasGeneratedBill ? "Preview Bill" : "Bill Not Generated"}
               </button>
               <div className="flex items-center justify-center px-4 py-2 bg-gray-100 rounded-md">
                 <DollarSign className="w-4 h-4 mr-2 text-gray-600" />
                 <span className="font-medium">Total: ${calculateTotal()}</span>
               </div>
             </div>
+            {!hasGeneratedBill && (
+              <div className="flex items-center p-4 bg-yellow-50 rounded-md">
+                <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
+                <p className="text-yellow-700">Bill for selected period has not been generated by admin yet</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Transactions Table */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">
-              Transactions ({transactions.length})
+              Your Transactions ({transactions.length})
             </h3>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Transaction ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Menu Item
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Order Date/Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Qty
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Conversation
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conversation</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {transactions.map((transaction) => (
                   <tr key={transaction.id} 
-                    className={`hover:bg-gray-50 ${
-                      transaction.status === "MODIFIED" ? "bg-gray-100" : 
+                    className={`${
+                      transaction.status === "MODIFIED" ? "bg-yellow-50" :
                       transaction.status === "INACTIVE" ? "bg-gray-100 opacity-75" : ""
                     }`}>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -393,97 +434,97 @@ export default function EmployeeBillPayment() {
           </div>
         </div>
 
-        {/* Bill Preview Dialog */}
         {showBillPreview && billPreview && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div className="relative top-10 mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Bill Preview - {new Date(filters.year, filters.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Bill Preview - {new Date(filters.year, filters.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </h3>
                 <button onClick={() => setShowBillPreview(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Amount</p>
-                    <p className="text-2xl font-bold">${calculateTotal()}</p>
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => exportToExcel(transactions, 'monthly-bill')}
-                      className="flex items-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Excel
-                    </button>
-                  </div>
-                </div>
 
-                <div className="max-h-96 overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conversation</th>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-gray-600">Total Amount</p>
+                  <p className="text-2xl font-bold">${calculateTotal()}</p>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <button
+                    onClick={() => exportToExcel(billPreview.transactions, 'monthly-bill')}
+                    className="flex items-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Excel
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {billPreview.transactions.map((transaction) => (
+                      <tr key={transaction.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {new Date(transaction.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{transaction.menuItemName}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">{transaction.quantity}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">${transaction.totalPrice.toFixed(2)}</td>
                       </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {transactions.map((transaction) => (
-                        <tr key={transaction.id} className={transaction.status === "MODIFIED" ? "bg-gray-50" : ""}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {new Date(transaction.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">{transaction.menuItemName}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">{transaction.quantity}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">${transaction.totalPrice.toFixed(2)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {getStatusBadge(transaction.status)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <button
-                              onClick={() => showConversation(transaction)}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              View
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+{/* Add conversation section */}
+      <div className="mt-6 border-t pt-4">
+        <h4 className="font-semibold mb-2">Transaction Remarks</h4>
+        <div className="space-y-2 max-h-40 overflow-y-auto">
+          {billPreview.transactions.map(tx => (
+            tx.remarks && (
+              <div key={tx.id} className="p-2 bg-gray-50 rounded">
+                <p className="text-sm font-medium">{tx.menuItemName}</p>
+                <p className="text-sm text-gray-600">{tx.remarks}</p>
+              </div>
+            )
+          ))}
+        </div>
+      </div>
 
-                <div className="flex justify-end space-x-2 pt-4">
-                  <button
-                    onClick={() => setShowBillPreview(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSendPaymentRequest}
-                    disabled={transactions.filter(t => t.status === "ACTIVE").length === 0}
-                    className={`flex items-center px-4 py-2 rounded-md text-white ${
-                      transactions.filter(t => t.status === "ACTIVE").length === 0
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-green-600 hover:bg-green-700"
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Send Payment Request
-                  </button>
-                </div>
+              <div className="flex justify-end space-x-2 pt-4">
+                <button
+                  onClick={() => setShowBillPreview(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleSendPaymentRequest}
+                  disabled={transactions.filter(t => t.status === "ACTIVE").length === 0}
+                  className={`flex items-center px-4 py-2 rounded-md text-white ${
+                    transactions.filter(t => t.status === "ACTIVE").length === 0
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-green-600 hover:bg-green-700"
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Send Payment Request
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Remark Dialog */}
         {showRemarkDialog && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
@@ -527,7 +568,6 @@ export default function EmployeeBillPayment() {
           </div>
         )}
 
-        {/* Conversation Dialog */}
         {selectedTransaction && conversation.length > 0 && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">

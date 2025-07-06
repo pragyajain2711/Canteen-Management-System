@@ -52,7 +52,15 @@ export const transactionApi = {
   getBillableTransactions: (employeeId, month, year) => 
     api.get('api/transactions/billable', { 
       params: { employeeId, month, year } 
-    })
+    }),
+
+    checkBillGenerated: (params) =>
+  api.get('api/transactions/bill-status', { params }),
+  
+    getGeneratedBill: (params) =>
+  api.get('api/transactions/billable', { params }),
+
+
 };
 
 // Order API endpoints (existing)

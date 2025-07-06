@@ -200,46 +200,124 @@ export default function AdminTransactionDashboard() {
     }
   };
 
+
   const handlePreviewBill = async () => {
-    if (!billFilters.employee || !billFilters.month || !billFilters.year) {
-      alert("Please select employee, month, and year");
-      return;
-    }
+  if (!billFilters.employee || !billFilters.month || !billFilters.year) {
+    alert("Please select employee, month, and year");
+    return;
+  }
 
-    try {
-      const response = await transactionApi.generateBill({
-        employeeId: billFilters.employee,
-        month: billFilters.month,
-        year: billFilters.year,
-      });
-      setBillPreview({
-        ...response.data,
-        modifiedCount: response.data.transactions.filter(t => t.status === "MODIFIED").length,
-        inactiveCount: response.data.transactions.filter(t => t.status === "INACTIVE").length,
-        activeTransactions: response.data.transactions.filter(t => t.status === "ACTIVE")
-      });
-      setShowBillPreview(true);
-    } catch (error) {
-      console.error("Error previewing bill:", error);
-    }
-  };
+  try {
+    const response = await transactionApi.generateBill({
+      employeeId: billFilters.employee,
+      month: billFilters.month,
+      year: billFilters.year,
+    });
 
-  const handleSendBill = async () => {
-    if (billPreview.modifiedCount > 0) {
-      alert("Cannot send bill. Some transactions have MODIFIED status. Please resolve all remarks first.");
-      return;
-    }
+    // Get only the selected employee's transactions
+    const employeeTransactions = transactions.filter(
+      t => t.employeeBusinessId === billFilters.employee
+    );
 
-    try {
-      await transactionApi.updateStatus(billPreview.id, "PAID");
-      alert("Bill sent successfully!");
-      setShowBillPreview(false);
-      setBillPreview(null);
-      loadData();
-    } catch (error) {
-      console.error("Error sending bill:", error);
-    }
-  };
+    setBillPreview({
+      ...response.data,
+      activeCount: employeeTransactions.filter(t => t.status === "ACTIVE").length,
+      generatedCount: employeeTransactions.filter(t => t.status === "GENERATED").length,
+      paidCount: employeeTransactions.filter(t => t.status === "PAID").length,
+      inactiveCount: employeeTransactions.filter(t => t.status === "INACTIVE").length,
+      modifiedCount: employeeTransactions.filter(t => t.status === "MODIFIED").length,
+      activeTransactions: response.data.transactions.filter(t => 
+        t.status === "ACTIVE" || t.status === "GENERATED"
+      )
+    });
+    setShowBillPreview(true);
+  } catch (error) {
+    console.error("Error previewing bill:", error);
+  }
+};
+
+const handleSendBill = async () => {
+  if (billPreview.modifiedCount > 0) {
+    alert(`Cannot send bill. ${billPreview.modifiedCount} transaction(s) have MODIFIED status.`);
+    return;
+  }
+
+  const confirmResend = window.confirm(
+    billPreview.generatedCount > 0 
+      ? "Bill has already been generated. Send again?"
+      : "Generate and send bill?"
+  );
+
+  if (!confirmResend) return;
+
+  try {
+    // Update status to GENERATED
+    await Promise.all(
+      billPreview.activeTransactions.map(tx => 
+        transactionApi.updateStatus(tx.id, "GENERATED")
+      )
+    );
+
+    alert("Bill generated successfully!");
+    loadData(); // Refresh data
+  } catch (error) {
+    console.error("Error sending bill:", error);
+  }
+};
+   /*const handlePreviewBill = async () => {
+  if (!billFilters.employee || !billFilters.month || !billFilters.year) {
+    alert("Please select employee, month, and year");
+    return;
+  }
+
+  try {
+    const response = await transactionApi.generateBill({
+      employeeId: billFilters.employee,
+      month: billFilters.month,
+      year: billFilters.year,
+    });
+    
+    // Calculate counts for ONLY the selected employee
+    const employeeTransactions = transactions.filter(
+      t => t.employeeBusinessId === billFilters.employee
+    );
+    
+    setBillPreview({
+      ...response.data,
+      modifiedCount: employeeTransactions.filter(t => t.status === "MODIFIED").length,
+      inactiveCount: employeeTransactions.filter(t => t.status === "INACTIVE").length,
+      activeTransactions: response.data.transactions.filter(t => t.status === "ACTIVE")
+    });
+    setShowBillPreview(true);
+  } catch (error) {
+    console.error("Error previewing bill:", error);
+  }
+};
+const handleSendBill = async () => {
+  if (billPreview.modifiedCount > 0) {
+    alert(`Cannot send bill. ${billPreview.modifiedCount} transaction(s) for this employee have MODIFIED status.`);
+    return;
+  }
+
+  const confirmResend = window.confirm("Bill has already been generated. Do you want to send it again?");
+  if (!confirmResend) return;
+
+  try {
+    const activeTransactions = billPreview.activeTransactions;
+
+    await Promise.all(
+      activeTransactions.map((tx) => transactionApi.updateStatus(tx.id, "PAID"))
+    );
+
+    alert("Bill sent successfully!");
+    // Don't clear the preview or rows
+    loadData();
+  } catch (error) {
+    console.error("Error sending bill:", error);
+  }
+};*/
+
+
 
   const handleCreateTransactions = async () => {
     try {
@@ -772,60 +850,76 @@ export default function AdminTransactionDashboard() {
           </div>
         )}
 
-      {/* Conversation Dialog */}
-{selectedTransaction && conversation.length > 0 && (
-  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-gray-900">
-          Conversation for Transaction #{selectedTransaction.transactionId}
-        </h3>
-        <button
-          onClick={() => {
-            setSelectedTransaction(null);
-            setConversation([]);
-          }}
-          className="text-gray-400 hover:text-gray-600"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      <div className="space-y-4 max-h-96 overflow-y-auto">
-        {conversation.map((msg, idx) => (
-          <div 
-            key={idx} 
-            className={`flex ${msg.type === 'remark' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div 
-              className={`rounded-lg p-3 max-w-xs ${msg.type === 'remark' ? 'bg-gray-100' : 'bg-blue-100'}`}
-            >
-              <div className={`text-sm font-medium ${msg.type === 'remark' ? 'text-gray-600' : 'text-blue-600'}`}>
-                {msg.user}
-              </div>
-              <div className="text-sm">{msg.message}</div>
-              <div className={`text-xs mt-1 ${msg.type === 'remark' ? 'text-gray-400' : 'text-blue-400'}`}>
-                {formatDateTime(msg.timestamp)}
+  {selectedTransaction && conversation.length > 0 && (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+        <div className="flex">
+          {/* Conversation Panel (Left) */}
+          <div className="flex-1 pr-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Conversation for Employee: {selectedTransaction.employeeBusinessId}
+              </h3>
+              <button onClick={() => {
+                setSelectedTransaction(null);
+                setConversation([]);
+              }} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {conversation.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.type === 'remark' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`rounded-lg p-3 max-w-xs ${msg.type === 'remark' ? 'bg-gray-100' : 'bg-blue-100'}`}>
+                    <div className={`text-sm font-medium ${msg.type === 'remark' ? 'text-gray-600' : 'text-blue-600'}`}>
+                      {msg.user}
+                    </div>
+                    <div className="text-sm">{msg.message}</div>
+                    <div className={`text-xs mt-1 ${msg.type === 'remark' ? 'text-gray-400' : 'text-blue-400'}`}>
+                      {formatDateTime(msg.timestamp)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+                  {/* Response Panel (Right) */}
+          <div className="w-96 border-l pl-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Add Response</h3>
+            </div>
+            <div className="space-y-4">
+              <textarea
+                placeholder="Type your response..."
+                value={responseText}
+                onChange={(e) => setResponseText(e.target.value)}
+                rows={8}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => setResponseText("")}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => {
+                    handleAddResponse();
+                    setResponseText("");
+                  }}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Response
+                </button>
               </div>
             </div>
           </div>
-        ))}
-      </div>
-      <div className="mt-4">
-        <button
-          onClick={() => {
-            setShowResponseDialog(true);
-            setSelectedTransaction(null);
-            setConversation([]);
-          }}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Add Response
-        </button>
+        </div>
       </div>
     </div>
-  </div>
-)}
-
+  )}
         {/* Bill Preview Dialog */}
         {showBillPreview && billPreview && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
