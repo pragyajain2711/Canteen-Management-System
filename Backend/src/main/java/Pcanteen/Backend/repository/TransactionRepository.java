@@ -26,7 +26,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     	
     
-    @Query("SELECT t FROM Transaction t WHERE " +
+   /* @Query("SELECT t FROM Transaction t WHERE " +
            "(:employeeId IS NULL OR t.employee.employeeId = :employeeId) AND " +
            "(:month IS NULL OR MONTH(t.createdAt) = :month) AND " +
            "(:year IS NULL OR YEAR(t.createdAt) = :year) AND " +
@@ -34,7 +34,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     List<Transaction> findBillableTransactions(
             @Param("employeeId") String employeeId,
             @Param("month") Integer month,
-            @Param("year") Integer year);
+            @Param("year") Integer year);*/
 
     @Query("SELECT DISTINCT e.employeeId, e.firstName, e.lastName FROM Transaction t JOIN t.employee e")
     List<Object[]> findAllEmployeeIdsAndNames();
@@ -46,5 +46,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     List<Transaction> findByEmployeeBusinessId(@Param("employeeBusinessId") String employeeBusinessId);
     
    // List<Transaction> findBillableTransactions(Long employeeId, int month, int year);
-
+    // Modified getBillableTransactions in repository
+    @Query("SELECT t FROM Transaction t WHERE " +
+    	       "t.employee.employeeId = :employeeId AND " +
+    	       "(:month IS NULL OR MONTH(t.createdAt) = :month) AND " +
+    	       "(:year IS NULL OR YEAR(t.createdAt) = :year)")
+    	List<Transaction> findBillableTransactions(
+    	    @Param("employeeId") String employeeId,
+    	    @Param("month") Integer month,
+    	    @Param("year") Integer year);
 }

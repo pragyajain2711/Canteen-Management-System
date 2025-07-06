@@ -112,4 +112,19 @@ public class TransactionController {
         transactionService.createTransactionsForCancelledOrders();
         return ResponseEntity.ok("Transactions created successfully");
     }
+    
+    @GetMapping("/bill-status")
+    public ResponseEntity<Map<String, Boolean>> checkBillGenerated(
+            @RequestParam String employeeId,
+            @RequestParam int month,
+            @RequestParam int year) {
+        
+        boolean hasGenerated = transactionService.hasGeneratedBill(employeeId, month, year);
+        
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("hasGenerated", hasGenerated);
+        
+        return ResponseEntity.ok(response);
+    }
+
 }

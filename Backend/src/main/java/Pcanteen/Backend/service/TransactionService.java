@@ -100,31 +100,38 @@ public class TransactionService {
         return transactionRepository.findAllEmployeeIdsAndNames();
     }
 
-    public BillDTO generateBill(BillRequest request, String user) {
-        List<Transaction> transactions = transactionRepository.findBillableTransactions(
+  /*  public BillDTO generateBill(BillRequest request, String user) {
+        // Get ALL transactions for the employee/month/year
+        List<Transaction> allTransactions = transactionRepository.findBillableTransactions(
                 request.getEmployeeId(), 
                 request.getMonth(), 
                 request.getYear());
         
-        if (transactions.isEmpty()) {
-            throw new ResourceNotFoundException("No billable transactions found");
+        if (allTransactions.isEmpty()) {
+            throw new ResourceNotFoundException("No transactions found");
         }
+        
+        // Create bill with only ACTIVE transactions for amount calculation
+        List<Transaction> activeTransactions = allTransactions.stream()
+                .filter(t -> t.getStatus().equals("ACTIVE"))
+                .collect(Collectors.toList());
         
         BillDTO bill = new BillDTO();
         bill.setEmployeeId(request.getEmployeeId());
-        bill.setEmployeeName(transactions.get(0).getEmployee().getFullName());
+        bill.setEmployeeName(allTransactions.get(0).getEmployee().getFullName());
         bill.setMonth(request.getMonth());
         bill.setYear(request.getYear());
-        bill.setTotalAmount(transactions.stream()
+        bill.setTotalAmount(activeTransactions.stream()
                 .mapToDouble(Transaction::getTotalPrice)
                 .sum());
-        bill.setTransactions(transactions.stream()
+        
+        // Include ALL transactions in the DTO (frontend will filter display)
+        bill.setTransactions(allTransactions.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList()));
         
         return bill;
-    }
-
+    }*/
     public TransactionDTO getTransactionById(Long id) {
         Transaction transaction = transactionRepository.findByIdWithAssociations(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction not found"));
@@ -191,11 +198,79 @@ public class TransactionService {
     }
     
     public List<TransactionDTO> getBillableTransactions(String employeeId, int month, int year) {
-        List<Transaction> transactions = transactionRepository.findBillableTransactions(employeeId, month, year);
+        List<Transaction> transactions = transactionRepository.findBillableTransactions(
+            employeeId, 
+            month != 0 ? month : null, 
+            year != 0 ? year : null
+        );
+        
         return transactions.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+            .map(this::convertToDTO)
+            .collect(Collectors.toList());
     }
+    
+   public boolean hasGeneratedBill(String employeeId, int month, int year) {
+        List<Transaction> transactions = transactionRepository.findBillableTransactions(
+            employeeId, 
+            month != 0 ? month : null, 
+            year != 0 ? year : null
+        );
+        
+        return transactions.stream()
+            .anyMatch(tx -> "GENERATED".equalsIgnoreCase(tx.getStatus()) || 
+                           "PAID".equalsIgnoreCase(tx.getStatus()));
+    }
+
+    public BillDTO generateBill(BillRequest request, String user) {
+        List<Transaction> transactions = transactionRepository.findBillableTransactions(
+            request.getEmployeeId(),
+            request.getMonth(),
+            request.getYear()
+        );
+
+        // Update status to GENERATED
+        transactions.forEach(t -> {
+            if ("ACTIVE".equals(t.getStatus())) {
+                t.setStatus("GENERATED");
+                t.setUpdatedBy(user);
+                transactionRepository.save(t);
+            }
+        });
+
+        // Calculate counts
+        long activeCount = transactions.stream().filter(t -> "ACTIVE".equals(t.getStatus())).count();
+        long generatedCount = transactions.stream().filter(t -> "GENERATED".equals(t.getStatus())).count();
+        long paidCount = transactions.stream().filter(t -> "PAID".equals(t.getStatus())).count();
+        long inactiveCount = transactions.stream().filter(t -> "INACTIVE".equals(t.getStatus())).count();
+        long modifiedCount = transactions.stream().filter(t -> "MODIFIED".equals(t.getStatus())).count();
+
+        BillDTO bill = new BillDTO();
+        bill.setEmployeeId(request.getEmployeeId());
+        bill.setEmployeeName(transactions.isEmpty() ? "" : transactions.get(0).getEmployee().getFullName());
+        bill.setMonth(request.getMonth());
+        bill.setYear(request.getYear());
+        bill.setTotalAmount(transactions.stream()
+            .filter(t -> "ACTIVE".equals(t.getStatus()) || "GENERATED".equals(t.getStatus()))
+            .mapToDouble(Transaction::getTotalPrice)
+            .sum());
+        
+        bill.setTransactions(transactions.stream()
+            .map(this::convertToDTO)
+            .collect(Collectors.toList()));
+        
+        // Add counts to DTO
+        bill.setActiveCount(activeCount);
+        bill.setGeneratedCount(generatedCount);
+        bill.setPaidCount(paidCount);
+        bill.setInactiveCount(inactiveCount);
+        bill.setModifiedCount(modifiedCount);
+
+        return bill;
+    }
+    /*public boolean hasGeneratedBill(String employeeId, int month, int year) {
+        List<Transaction> transactions = transactionRepository.findBillableTransactions(employeeId, month, year);
+        return transactions.stream().anyMatch(tx -> "PAID".equalsIgnoreCase(tx.getStatus()));
+    }*/
 
 
 }
