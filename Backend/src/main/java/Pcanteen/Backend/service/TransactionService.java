@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,7 +53,7 @@ public class TransactionService {
 
     public void createTransaction(Order order, String status) {
         Transaction transaction = new Transaction();
-        transaction.setTransactionId("TXN-" + System.currentTimeMillis());
+        transaction.setTransactionId("TXN-" + UUID.randomUUID().toString());
         transaction.setOrder(order);
         transaction.setEmployee(order.getEmployee());
         transaction.setMenuItem(order.getMenuItem());
