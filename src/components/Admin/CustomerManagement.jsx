@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import {
   Search,
   UserPlus,
@@ -16,82 +17,50 @@ import {
   ChevronUp,
   ChevronDown,
   Calendar,
-} from "lucide-react";
-import { DateRange } from 'react-date-range';
-import { format, subDays, subMonths, subYears, formatDistanceToNow } from 'date-fns';
-import 'react-date-range/dist/styles.css';
-import 'react-date-range/dist/theme/default.css';
-import api from "../api";
+} from "lucide-react"
+import { DateRange } from "react-date-range"
+import { format, formatDistanceToNow } from "date-fns"
+import "react-date-range/dist/styles.css"
+import "react-date-range/dist/theme/default.css"
+import api from "../api"
 
 export default function CustomerManagement() {
   // State declarations
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [customers, setCustomers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [searchTerm, setSearchTerm] = useState("")
   const [filters, setFilters] = useState({
     active: "all",
     customerType: "all",
     dateRange: "all",
-  });
+  })
   const [sortConfig, setSortConfig] = useState({
     key: "createdAt",
     direction: "desc",
-  });
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [currentCustomer, setCurrentCustomer] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
- 
-  const handleDateRangeChange = (rangeType) => {
-  setFilters(prev => ({ ...prev, dateRange: rangeType }));
-  
-  if (rangeType === 'custom') {
-    setShowDatePicker(true);
-  } else {
-    fetchCustomers(searchTerm, filters, { rangeType });
-  }
-};
+  })
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [currentCustomer, setCurrentCustomer] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
-const handleCustomDateApply = () => {
-  setShowDatePicker(false);
-  if (dateRange[0].startDate && dateRange[0].endDate) {
-    fetchCustomers(searchTerm, filters, { 
-      rangeType: 'custom',
-      startDate: dateRange[0].startDate,
-      endDate: dateRange[0].endDate
-    });
-  }
-};
-/*
-const handleCustomDateApply = () => {
-  setShowDatePicker(false);
-  if (dateRange[0].startDate && dateRange[0].endDate) {
-    fetchCustomersByDateRange(
-      'custom', 
-      dateRange[0].startDate, 
-      dateRange[0].endDate
-    );
-  }
-};*/
   // Date range state
   const [dateRange, setDateRange] = useState([
     {
       startDate: new Date(),
       endDate: new Date(),
-      key: 'selection'
-    }
-  ]);
+      key: "selection",
+    },
+  ])
 
+  // Updated date ranges - removed "This Month" and "This Year"
   const dateRanges = [
     { value: "all", label: "All Time" },
     { value: "today", label: "Today" },
     { value: "week", label: "This Week" },
-    { value: "month", label: "This Month" },
-    { value: "year", label: "This Year" },
     { value: "custom", label: "Custom Range" },
-  ];
+  ]
 
   // Form state
   const [formData, setFormData] = useState({
@@ -104,97 +73,118 @@ const handleCustomDateApply = () => {
     isActive: true,
     password: "",
     confirmPassword: "",
-  });
+  })
 
-  const departments = ["Finance", "LPG", "IS", "HR", "Sales", "Reception", "Engineer", "Law"];
-  const customerTypes = ["Intern", "Employee", "Trainee", "Helper"];
+  const departments = ["Finance", "LPG", "IS", "HR", "Sales", "Reception", "Engineer", "Law"]
+  const customerTypes = ["Intern", "Employee", "Trainee", "Helper"]
 
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    fetchCustomers()
+  }, [])
 
-  
-
- /* const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/api/admin/customers");
-      const filteredCustomers = response.data.filter(
-        (customer) => customer.employeeId !== "superadmin"
-      );
-
-      setCustomers(filteredCustomers);
-      setLoading(false);
-    } catch (error) {
-      console.error("Failed to fetch customers:", error);
-      setError("Failed to fetch customers");
-      setLoading(false);
-    }
-  };*/
-
-  const fetchCustomers = async (searchTerm = '', filters = {}, dateRangeParams = {}) => {
-  try {
-    setLoading(true);
-    const params = new URLSearchParams();
-    
-    // Add search term if provided
-    if (searchTerm) {
-      params.append('search', searchTerm);
-    }
-    
-    // Add status filter if not 'all'
-    if (filters.active && filters.active !== 'all') {
-      params.append('isActive', filters.active === 'active');
-    }
-    
-    // Add customer type filter if not 'all'
-    if (filters.customerType && filters.customerType !== 'all') {
-      params.append('customerType', filters.customerType);
-    }
-    
-    // Handle date range filtering
-    if (dateRangeParams.rangeType) {
-      params.append('rangeType', dateRangeParams.rangeType);
-      
-      if (dateRangeParams.rangeType === 'custom' && dateRangeParams.startDate && dateRangeParams.endDate) {
-        params.append('startDate', dateRangeParams.startDate.toISOString());
-        params.append('endDate', dateRangeParams.endDate.toISOString());
+  // Add this useEffect for ESC key and body scroll handling
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === "Escape" && showDatePicker) {
+        setShowDatePicker(false)
       }
     }
-    
-    const response = await api.get(`/api/admin/customers/filter?${params.toString()}`);
-    setCustomers(response.data);
-    setLoading(false);
-  } catch (error) {
-    console.error("Failed to fetch customers:", error);
-    setLoading(false);
+
+    if (showDatePicker) {
+      document.addEventListener("keydown", handleEscKey)
+      document.body.style.overflow = "hidden" // Prevent background scrolling
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscKey)
+      document.body.style.overflow = "unset"
+    }
+  }, [showDatePicker])
+
+  const fetchCustomers = async (searchTerm = "", filters = {}, dateRangeParams = {}) => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+
+      // Add search term if provided
+      if (searchTerm) {
+        params.append("search", searchTerm)
+      }
+
+      // Add status filter if not 'all'
+      if (filters.active && filters.active !== "all") {
+        params.append("isActive", filters.active === "active")
+      }
+
+      // Add customer type filter if not 'all'
+      if (filters.customerType && filters.customerType !== "all") {
+        params.append("customerType", filters.customerType)
+      }
+
+      // Handle date range filtering
+      if (dateRangeParams.rangeType) {
+        params.append("rangeType", dateRangeParams.rangeType)
+
+        if (dateRangeParams.rangeType === "custom" && dateRangeParams.startDate && dateRangeParams.endDate) {
+          params.append("startDate", dateRangeParams.startDate.toISOString())
+          params.append("endDate", dateRangeParams.endDate.toISOString())
+        }
+      }
+
+      const response = await api.get(`/api/admin/customers/filter?${params.toString()}`)
+      const filteredCustomers = response.data.filter((customer) => customer.employeeId !== "superadmin")
+      setCustomers(filteredCustomers)
+      setLoading(false)
+    } catch (error) {
+      console.error("Failed to fetch customers:", error)
+      setError("Failed to fetch customers")
+      setLoading(false)
+    }
   }
-};
 
+  const handleDateRangeChange = (rangeType) => {
+    setFilters((prev) => ({ ...prev, dateRange: rangeType }))
 
+    if (rangeType === "custom") {
+      setShowDatePicker(true)
+    } else {
+      fetchCustomers(searchTerm, filters, { rangeType })
+    }
+  }
 
- const handleSearchChange = (e) => {
-  const term = e.target.value;
-  setSearchTerm(term);
-  fetchCustomers(term, filters);
-};
+  const handleCustomDateApply = () => {
+    setShowDatePicker(false)
+    if (dateRange[0].startDate && dateRange[0].endDate) {
+      fetchCustomers(searchTerm, filters, {
+        rangeType: "custom",
+        startDate: dateRange[0].startDate,
+        endDate: dateRange[0].endDate,
+      })
+    }
+  }
 
- const handleFilterChange = (filterName, value) => {
-  const newFilters = {
-    ...filters,
-    [filterName]: value
-  };
-  setFilters(newFilters);
-  fetchCustomers(searchTerm, newFilters);
-};
+  const handleSearchChange = (e) => {
+    const term = e.target.value
+    setSearchTerm(term)
+    fetchCustomers(term, filters)
+  }
+
+  const handleFilterChange = (filterName, value) => {
+    const newFilters = {
+      ...filters,
+      [filterName]: value,
+    }
+    setFilters(newFilters)
+    fetchCustomers(searchTerm, newFilters)
+  }
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value, type, checked } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
-    }));
-  };
+    }))
+  }
 
   const resetForm = () => {
     setFormData({
@@ -207,21 +197,21 @@ const handleCustomDateApply = () => {
       isActive: true,
       password: "",
       confirmPassword: "",
-    });
-    setCurrentCustomer(null);
-  };
+    })
+    setCurrentCustomer(null)
+  }
 
   const handleSort = (key) => {
-    let direction = "asc";
+    let direction = "asc"
     if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
+      direction = "desc"
     }
-    setSortConfig({ key, direction });
-  };
+    setSortConfig({ key, direction })
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+    e.preventDefault()
+    setIsSubmitting(true)
 
     try {
       if (currentCustomer) {
@@ -232,36 +222,36 @@ const handleCustomDateApply = () => {
           mobileNumber: formData.mobileNumber,
           customerType: formData.customerType,
           isActive: formData.isActive,
-        };
-        await api.put(`/api/admin/customers/${currentCustomer.id}`, updatedCustomer);
+        }
+        await api.put(`/api/admin/customers/${currentCustomer.id}, updatedCustomer`)
       } else {
-        await api.post("/api/admin/customers", formData);
+        await api.post("/api/admin/customers", formData)
       }
-      setIsAddModalOpen(false);
-      setIsEditModalOpen(false);
-      resetForm();
-      fetchCustomers();
+      setIsAddModalOpen(false)
+      setIsEditModalOpen(false)
+      resetForm()
+      fetchCustomers()
     } catch (error) {
-      console.error("Error saving customer:", error);
-      setError("Failed to save customer");
+      console.error("Error saving customer:", error)
+      setError("Failed to save customer")
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   const toggleCustomerStatus = async (id, currentStatus) => {
     try {
-      await api.patch(`/api/admin/customers/${id}/status?active=${!currentStatus}`);
-      fetchCustomers();
-      setError(null);
+      await api.patch(`/api/admin/customers/${id}/status?active=${!currentStatus}`)
+      fetchCustomers()
+      setError(null)
     } catch (error) {
-      console.error("Error updating status:", error);
-      setError("Failed to update status");
+      console.error("Error updating status:", error)
+      setError("Failed to update status")
     }
-  };
+  }
 
   const openEditModal = (customer) => {
-    setCurrentCustomer(customer);
+    setCurrentCustomer(customer)
     setFormData({
       firstName: customer.firstName,
       lastName: customer.lastName,
@@ -272,15 +262,13 @@ const handleCustomDateApply = () => {
       isActive: customer.isActive,
       password: "",
       confirmPassword: "",
-    });
-    setIsEditModalOpen(true);
-  };
-
+    })
+    setIsEditModalOpen(true)
+  }
 
   const sortedAndFilteredCustomers = customers.filter((customer) => {
     // Filter out superadmins
-    //if (customer.isSuperAdmin) return false;
-if (customer.employeeId === "superadmin") return false;
+    if (customer.employeeId === "superadmin") return false
 
     // Search filter
     const matchesSearch =
@@ -289,23 +277,19 @@ if (customer.employeeId === "superadmin") return false;
       customer.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.customerType?.toLowerCase().includes(searchTerm.toLowerCase());
+      customer.customerType?.toLowerCase().includes(searchTerm.toLowerCase())
 
     // Active/inactive filter
     const matchesActive =
       filters.active === "all" ||
       (filters.active === "active" && customer.isActive) ||
-      (filters.active === "inactive" && !customer.isActive);
+      (filters.active === "inactive" && !customer.isActive)
 
     // Customer type filter
-    const matchesCustomerType =
-      filters.customerType === "all" || customer.customerType === filters.customerType;
-    
-    return matchesSearch && matchesActive && matchesCustomerType;
-  });
+    const matchesCustomerType = filters.customerType === "all" || customer.customerType === filters.customerType
 
-
-
+    return matchesSearch && matchesActive && matchesCustomerType
+  })
 
   const getCustomerTypeColor = (type) => {
     const colors = {
@@ -313,9 +297,9 @@ if (customer.employeeId === "superadmin") return false;
       Trainee: "bg-green-100 text-green-800 border-green-200",
       Intern: "bg-purple-100 text-purple-800 border-purple-200",
       Helper: "bg-orange-100 text-orange-800 border-orange-200",
-    };
-    return colors[type] || "bg-gray-100 text-gray-800 border-gray-200";
-  };
+    }
+    return colors[type] || "bg-gray-100 text-gray-800 border-gray-200"
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
@@ -335,8 +319,8 @@ if (customer.employeeId === "superadmin") return false;
 
             <button
               onClick={() => {
-                resetForm();
-                setIsAddModalOpen(true);
+                resetForm()
+                setIsAddModalOpen(true)
               }}
               className="group px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 flex items-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
             >
@@ -364,9 +348,7 @@ if (customer.employeeId === "superadmin") return false;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Customers</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {customers.filter((c) => c.isActive).length}
-                </p>
+                <p className="text-2xl font-bold text-green-600">{customers.filter((c) => c.isActive).length}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
                 <UserCheck className="h-6 w-6 text-green-600" />
@@ -378,9 +360,7 @@ if (customer.employeeId === "superadmin") return false;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Inactive Customers</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {customers.filter((c) => !c.isActive).length}
-                </p>
+                <p className="text-2xl font-bold text-red-600">{customers.filter((c) => !c.isActive).length}</p>
               </div>
               <div className="p-3 bg-red-100 rounded-lg">
                 <UserX className="h-6 w-6 text-red-600" />
@@ -406,9 +386,7 @@ if (customer.employeeId === "superadmin") return false;
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Search */}
             <div className="lg:col-span-1">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Search Customers
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Search Customers</label>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
@@ -458,92 +436,105 @@ if (customer.employeeId === "superadmin") return false;
               </select>
             </div>
 
-            {/* Date Range Filter *
-            <div>
+            {/* Date Range Filter - Fixed z-index with Portal */}
+            <div className="relative">
               <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-500" />
                 Date Range
               </label>
-              <select
-                value={filters.dateRange}
-                onChange={(e) => handleFilterChange("dateRange", e.target.value)}
-                className="border border-gray-200 rounded-xl px-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm"
-              >
-                {dateRanges.map((range) => (
-                  <option key={range.value} value={range.value}>
-                    {range.label}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={filters.dateRange}
+                  onChange={(e) => handleDateRangeChange(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm"
+                >
+                  {dateRanges.map((range) => (
+                    <option key={range.value} value={range.value}>
+                      {range.label}
+                    </option>
+                  ))}
+                </select>
+
+                {filters.dateRange === "custom" && (
+                  <button
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="border border-gray-200 rounded-xl px-4 py-3 whitespace-nowrap bg-white/50 backdrop-blur-sm"
+                  >
+                    {dateRange[0].startDate
+                      ?` ${format(dateRange[0].startDate, "MMM dd, yyyy")} - ${format(dateRange[0].endDate, "MMM dd, yyyy")}`
+                      : "Select dates"}
+                  </button>
+                )}
+              </div>
+
+              {/* Fixed Calendar Positioning - Using Portal to render at document root */}
+              {showDatePicker &&
+                createPortal(
+                  <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                    <div
+                      className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowDatePicker(false)}
+                    />
+                    <div className="relative z-[100000] bg-white shadow-2xl rounded-2xl p-6 border border-gray-200 max-w-lg">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Select Date Range</h3>
+                        <button
+                          onClick={() => setShowDatePicker(false)}
+                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+
+                      <DateRange
+                        editableDateInputs={true}
+                        onChange={(item) => setDateRange([item.selection])}
+                        moveRangeOnFirstSelection={false}
+                        ranges={dateRange}
+                        className="border border-gray-200 rounded-lg"
+                      />
+
+                      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+                        <button
+                          onClick={() => {
+                            setDateRange([
+                              {
+                                startDate: new Date(),
+                                endDate: new Date(),
+                                key: "selection",
+                              },
+                            ])
+                            setShowDatePicker(false)
+                          }}
+                          className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          onClick={handleCustomDateApply}
+                          className="px-6 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  </div>,
+                  document.body,
+                )}
             </div>
           </div>
-        </div>*/}
-        {/* Date Range Filter */}
-<div className="relative">
-  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-    <Calendar className="h-4 w-4 text-gray-500" />
-    Date Range
-  </label>
-  <div className="flex gap-2">
-    <select
-      value={filters.dateRange}
-      onChange={(e) => handleDateRangeChange(e.target.value)}
-      className="border border-gray-200 rounded-xl px-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm"
-    >
-      {dateRanges.map((range) => (
-        <option key={range.value} value={range.value}>
-          {range.label}
-        </option>
-      ))}
-    </select>
-    
-    {filters.dateRange === 'custom' && (
-      <button 
-        onClick={() => setShowDatePicker(!showDatePicker)}
-        className="border border-gray-200 rounded-xl px-4 py-3 whitespace-nowrap"
-      >
-        {dateRange[0].startDate ? 
-          `${format(dateRange[0].startDate, 'MMM dd, yyyy')} - ${format(dateRange[0].endDate, 'MMM dd, yyyy')}` :
-          'Select dates'}
-      </button>
-    )}
-  </div>
-  
-  {showDatePicker && (
-    <div className="absolute z-50 mt-1 bg-white shadow-lg rounded-lg p-2">
-      <DateRange
-        editableDateInputs={true}
-        onChange={item => setDateRange([item.selection])}
-        moveRangeOnFirstSelection={false}
-        ranges={dateRange}
-      />
-      <div className="flex justify-end gap-2 mt-2">
-        <button 
-          onClick={() => {
-            setDateRange([{
-              startDate: new Date(),
-              endDate: new Date(),
-              key: 'selection'
-            }]);
-            setShowDatePicker(false);
-          }}
-          className="px-3 py-1 text-sm text-gray-600"
-        >
-          Clear
-        </button>
-        <button 
-          onClick={handleCustomDateApply}
-          className="px-3 py-1 bg-blue-600 text-white text-sm rounded"
-        >
-          Apply
-        </button>
-      </div>
-    </div>
-  )}
+        </div>
 
-</div>
-</div>
-</div>
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-8">
+            <div className="flex items-center gap-2">
+              <X className="h-5 w-5 text-red-500" />
+              <p className="text-red-700 font-medium">{error}</p>
+            </div>
+          </div>
+        )}
+
         {/* Customers Table */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
           {loading ? (
@@ -582,7 +573,7 @@ if (customer.employeeId === "superadmin") return false;
                       className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-50"
                       onClick={() => handleSort("created_at")}
                     >
-                     <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1">
                         Created At
                         {sortConfig.key === "created_at" && (
                           <span>
@@ -594,7 +585,7 @@ if (customer.employeeId === "superadmin") return false;
                           </span>
                         )}
                       </div>
-                      </th>
+                    </th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       Status
                     </th>
@@ -606,7 +597,7 @@ if (customer.employeeId === "superadmin") return false;
                 <tbody className="divide-y divide-gray-100">
                   {sortedAndFilteredCustomers.map((customer) => (
                     <tr key={customer.employeeId} className="hover:bg-blue-50/50 transition-colors duration-200">
-                       <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                             {customer.employeeId.slice(-2)}
@@ -616,7 +607,7 @@ if (customer.employeeId === "superadmin") return false;
                           </div>
                         </div>
                       </td>
-                       <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold">
                             {customer.firstName[0]}
@@ -641,30 +632,25 @@ if (customer.employeeId === "superadmin") return false;
                           <span className="text-sm font-medium text-gray-900">{customer.department}</span>
                         </div>
                       </td>
-                     
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-3 py-1 text-xs font-semibold rounded-full border ${getCustomerTypeColor(
-                            customer.customerType
+                            customer.customerType,
                           )}`}
                         >
                           {customer.customerType}
                         </span>
-                        </td>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {customer.createdAt ? (
                           <div className="relative group">
                             <div className="text-sm text-gray-500 cursor-help">
                               {format(new Date(customer.createdAt), "MMM dd, yyyy")}
                               <br />
-                              <span className="text-xs">
-                                {format(new Date(customer.createdAt), "hh:mm a")}
-                              </span>
+                              <span className="text-xs">{format(new Date(customer.createdAt), "hh:mm a")}</span>
                             </div>
-                             <div className="absolute hidden group-hover:block z-10 bg-gray-800 text-white text-xs p-2 rounded shadow-lg mt-1 w-64">
-                              <div className="font-medium">
-                                {format(new Date(customer.createdAt), "PPPPpp")}
-                              </div>
+                            <div className="absolute hidden group-hover:block z-10 bg-gray-800 text-white text-xs p-2 rounded shadow-lg mt-1 w-64">
+                              <div className="font-medium">{format(new Date(customer.createdAt), "PPPPpp")}</div>
                               <div className="text-gray-300 mt-1">
                                 {formatDistanceToNow(new Date(customer.createdAt), {
                                   addSuffix: true,
@@ -672,16 +658,9 @@ if (customer.employeeId === "superadmin") return false;
                               </div>
                             </div>
                           </div>
-                           ) : (
+                        ) : (
                           <span className="text-gray-400 text-sm">Not recorded</span>
                         )}
-                      </td>
-                     <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={'px-3 py-1 text-xs font-semibold rounded-full border ${getCustomerTypeColor(customer.customerType)}'}
-                        >
-                          {customer.customerType}
-                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
@@ -729,7 +708,8 @@ if (customer.employeeId === "superadmin") return false;
             </div>
           )}
         </div>
-  {/* Add Customer Modal */}
+
+        {/* Add Customer Modal */}
         {isAddModalOpen && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1080,14 +1060,4 @@ if (customer.employeeId === "superadmin") return false;
       </div>
     </div>
   )
-}
-//Helper function for customer type colors
-function getCustomerTypeColor(type) {
-  const colors = {
-    Employee: "bg-blue-100 text-blue-800 border-blue-200",
-    Trainee: "bg-green-100 text-green-800 border-green-200",
-    Intern: "bg-purple-100 text-purple-800 border-purple-200",
-    Helper: "bg-orange-100 text-orange-800 border-orange-200",
-  };
-  return colors[type] || "bg-gray-100 text-gray-800 border-gray-200";
 }

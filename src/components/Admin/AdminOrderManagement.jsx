@@ -69,7 +69,7 @@ export default function AdminOrderManagement() {
   const [selectedOrders, setSelectedOrders] = useState([])
   const [sortConfig, setSortConfig] = useState({ key: "orderTime", direction: "desc" })
   const [expandedOrders, setExpandedOrders] = useState({})
-  const [activeOrderFilter, setActiveOrderFilter] = useState("all") // New state for active orders filter
+  const [activeOrderFilter, setActiveOrderFilter] = useState("all")
 
   const queryClient = useQueryClient()
 
@@ -133,48 +133,49 @@ export default function AdminOrderManagement() {
       currentPrice: order.menuItem?.currentPrice || order.priceAtOrder,
     })) || []
 
-  // Enhanced filtering - FIXED SEARCH LOGIC
-  const filteredOrders = normalizedOrders.filter((order) => {
-    const isActiveStatus = activeStatuses.includes(order.status)
-
-    // FIXED: Improved search logic to handle all the fields properly
-    const searchLower = searchTerm.toLowerCase()
-    const matchesSearch =
-      searchTerm === "" ||
-      order.employeeId.toLowerCase().includes(searchLower) ||
-      order.employeeName.toLowerCase().includes(searchLower) ||
-      order.menuItemName.toLowerCase().includes(searchLower) ||
-      String(order.id).toLowerCase().includes(searchLower) ||
-      order.menuItemId.toLowerCase().includes(searchLower)
-
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter.toUpperCase()
-    const matchesDepartment = departmentFilter === "all" || order.employeeDepartment === departmentFilter
-
-    return isActiveStatus && matchesSearch && matchesStatus && matchesDepartment
-  })
-
-  // Get all orders for comprehensive stats (including completed ones)
-  const allOrdersForStats = normalizedOrders || []
-
-  // Get today's orders only
+  // Get today's date for filtering
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const todaysOrders = allOrdersForStats.filter((order) => {
+
+  // Filter orders for today
+  const todaysOrders = normalizedOrders.filter((order) => {
     const orderDate = new Date(order.orderTime)
     orderDate.setHours(0, 0, 0, 0)
     return orderDate.getTime() === today.getTime()
   })
 
-  // FIXED: Active orders filtered by status for the Active Orders card
-  const activeOrdersByStatus = filteredOrders.filter((order) => {
+  // Enhanced filtering - FIXED SEARCH LOGIC to search by employee name and ID
+  const filteredOrders = todaysOrders.filter((order) => {
+    // FIXED: Search only by employee name and employee ID
+    const searchLower = searchTerm.toLowerCase()
+    const matchesSearch =
+      searchTerm === "" ||
+      order.employeeId.toLowerCase().includes(searchLower) ||
+      order.employeeName.toLowerCase().includes(searchLower)
+
+    const matchesStatus = statusFilter === "all" || order.status === statusFilter.toUpperCase()
+    const matchesDepartment = departmentFilter === "all" || order.employeeDepartment === departmentFilter
+
+    return matchesSearch && matchesStatus && matchesDepartment
+  })
+
+  // Get active orders for display (pending, preparing, ready)
+  const activeOrdersForDisplay = filteredOrders.filter((order) => activeStatuses.includes(order.status))
+
+  // Get today's delivered and cancelled orders
+  const todaysDeliveredOrders = todaysOrders.filter((order) => order.status === "DELIVERED")
+  const todaysCancelledOrders = todaysOrders.filter((order) => order.status === "CANCELLED")
+
+  // Active orders filtered by status for the Active Orders card
+  const activeOrdersByStatus = activeOrdersForDisplay.filter((order) => {
     if (activeOrderFilter === "all") return true
     return order.status === activeOrderFilter.toUpperCase()
   })
 
-  // FIXED: Use the correct filtered orders for display
+  // Use the correct filtered orders for display
   const ordersToDisplay = activeOrdersByStatus
 
-  // Sorting - FIXED: Apply sorting to the correct filtered orders
+  // Sorting - Apply sorting to the correct filtered orders
   const sortedOrders = [...ordersToDisplay].sort((a, b) => {
     let aValue = a[sortConfig.key]
     let bValue = b[sortConfig.key]
@@ -212,18 +213,14 @@ export default function AdminOrderManagement() {
   }
 
   // New orders notification
-  const newOrders = orders?.filter((o) => o.status === "PENDING").slice(0, 3) || []
+  const newOrders = activeOrdersForDisplay?.filter((o) => o.status === "PENDING").slice(0, 3) || []
 
-  // Comprehensive stats calculations
-  const deliveredOrders = allOrdersForStats.filter((order) => order.status === "DELIVERED").length
-  const cancelledOrders = allOrdersForStats.filter((order) => order.status === "CANCELLED").length
-
-  // Active orders status counts - FIXED: Use correct base for counting
+  // Active orders status counts
   const activeOrdersCounts = {
-    all: filteredOrders.length,
-    pending: filteredOrders.filter((order) => order.status === "PENDING").length,
-    preparing: filteredOrders.filter((order) => order.status === "PREPARING").length,
-    ready: filteredOrders.filter((order) => order.status === "READY").length,
+    all: activeOrdersForDisplay.length,
+    pending: activeOrdersForDisplay.filter((order) => order.status === "PENDING").length,
+    preparing: activeOrdersForDisplay.filter((order) => order.status === "PREPARING").length,
+    ready: activeOrdersForDisplay.filter((order) => order.status === "READY").length,
   }
 
   if (isLoading)
@@ -265,7 +262,7 @@ export default function AdminOrderManagement() {
                 </span>
               )}
             </h1>
-            <p className="text-gray-600 mt-1">Manage pending, preparing, and ready orders</p>
+            <p className="text-gray-600 mt-1">Manage today's pending, preparing, and ready orders</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -285,12 +282,12 @@ export default function AdminOrderManagement() {
           </div>
         </div>
 
-        {/* Comprehensive Stats Cards */}
+        {/* Today's Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           <div className="bg-white p-4 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <p className="text-sm text-gray-600">Active Orders</p>
+                <p className="text-sm text-gray-600">Active Orders Today</p>
                 <p className="text-2xl font-bold text-blue-600">{activeOrdersCounts[activeOrderFilter]}</p>
               </div>
               <Package className="text-blue-600" size={24} />
@@ -312,7 +309,7 @@ export default function AdminOrderManagement() {
           <div className="bg-white p-4 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Today's Orders</p>
+                <p className="text-sm text-gray-600">Total Orders Today</p>
                 <p className="text-2xl font-bold text-gray-900">{todaysOrders.length}</p>
               </div>
               <Package className="text-gray-600" size={24} />
@@ -322,8 +319,8 @@ export default function AdminOrderManagement() {
           <div className="bg-white p-4 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Delivered</p>
-                <p className="text-2xl font-bold text-gray-900">{deliveredOrders}</p>
+                <p className="text-sm text-gray-600">Delivered Today</p>
+                <p className="text-2xl font-bold text-green-600">{todaysDeliveredOrders.length}</p>
               </div>
               <CheckCircle className="text-green-600" size={24} />
             </div>
@@ -332,8 +329,8 @@ export default function AdminOrderManagement() {
           <div className="bg-white p-4 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Cancelled</p>
-                <p className="text-2xl font-bold text-gray-900">{cancelledOrders}</p>
+                <p className="text-sm text-gray-600">Cancelled Today</p>
+                <p className="text-2xl font-bold text-red-600">{todaysCancelledOrders.length}</p>
               </div>
               <X className="text-red-600" size={24} />
             </div>
@@ -349,7 +346,7 @@ export default function AdminOrderManagement() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="Search by ID, Name, or Item..."
+                placeholder="Search by Employee Name or ID..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -377,8 +374,8 @@ export default function AdminOrderManagement() {
               <option value="HR">HR</option>
               <option value="Finance">Finance</option>
               <option value="Operations">Operations</option>
-              <option value="Finance">IS</option>
-              <option value="Operations">LPG</option>
+              <option value="IS">IS</option>
+              <option value="LPG">LPG</option>
             </select>
 
             <div className="text-sm text-gray-600 flex items-center">Showing {sortedOrders.length} active orders</div>
@@ -527,7 +524,9 @@ export default function AdminOrderManagement() {
           <div className="text-center py-12 bg-white rounded-lg shadow-sm border">
             <Package className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No active orders found</h3>
-            <p className="mt-1 text-sm text-gray-500">All orders have been completed or there are no new orders.</p>
+            <p className="mt-1 text-sm text-gray-500">
+              All orders have been completed or there are no new orders today.
+            </p>
           </div>
         )}
       </div>
