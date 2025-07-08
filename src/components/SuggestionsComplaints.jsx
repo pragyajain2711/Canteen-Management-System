@@ -1,8 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from './AuthContext';
 import { MessageSquare, Check, X, Send, AlertCircle } from 'lucide-react';
-import { saveSuggestions, loadSuggestions } from './suggestionService';
-const STORAGE_KEY = 'canteen_suggestions_v2'; // Add this at the top of your file
+import { feedbackApi } from './api';
 
 const SuggestionsComplaints = () => {
   const { isAuthenticated, employee, isAdmin } = useContext(AuthContext);
@@ -13,270 +12,201 @@ const SuggestionsComplaints = () => {
   const [respondingTo, setRespondingTo] = useState(null);
   const [suggestionType, setSuggestionType] = useState('suggestion');
 
-  // Load suggestions on component mount
-  useEffect(() => {
-    const loaded = loadSuggestions();
-    setSuggestions(loaded);
-  }, []);
+  const loadSuggestions = async () => {
+    try {
+      let response;
+      if (isAdmin) {
+        const params = {};
+        if (activeTab === 'pending') params.status = 'PENDING';
+        if (activeTab === 'responded') params.status = 'RESOLVED';
+        
+        response = await feedbackApi.getAllSuggestions(params);
+      } else {
+        response = await feedbackApi.getMySuggestions();
+      }
+      setSuggestions(response.data);
+    } catch (error) {
+      console.error("Failed to load suggestions:", error);
+    }
+  };
 
-  // Save suggestions whenever they change
   useEffect(() => {
-    saveSuggestions(suggestions);
-  }, [suggestions]);
+    if (isAuthenticated) {
+      loadSuggestions();
+    }
+  }, [activeTab, isAdmin, isAuthenticated]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newSuggestion.trim()) return;
 
-    const suggestion = {
-      id: Date.now(),
-      employeeId: employee.employeeId,
-      employeeName: employee.fullName,
-      type: suggestionType,
-      text: newSuggestion,
-      date: new Date(),
-      status: 'pending',
-      response: null,
-      responseDate: null,
-    };
-
-    setSuggestions(prev => [suggestion, ...prev]);
-    setNewSuggestion('');
+    try {
+      await feedbackApi.createSuggestion(newSuggestion);
+      setNewSuggestion('');
+      loadSuggestions();
+    } catch (error) {
+      console.error("Failed to submit suggestion:", error);
+    }
   };
 
-  const handleRespond = (suggestionId) => {
+  const handleRespond = async (suggestionId) => {
     if (!responseText.trim()) return;
 
-    const updated = suggestions.map(s => 
-      s.id === suggestionId 
-        ? { 
-            ...s, 
-            response: responseText, 
-            responseDate: new Date(), 
-            status: 'responded' 
-          } 
-        : s
-    );
-
-    setSuggestions(updated);
-    setResponseText('');
-    setRespondingTo(null);
-  };
-
-  const filteredSuggestions = suggestions.filter(s => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'pending') return s.status === 'pending';
-    if (activeTab === 'responded') return s.status === 'responded';
-    if (activeTab === 'mine') return s.employeeId === employee?.employeeId;
-    if (activeTab === 'suggestions') return s.type === 'suggestion';
-    if (activeTab === 'complaints') return s.type === 'complaint';
-    return true;
-  });
-
-  // Clear all data (for testing purposes)
-  const clearAllData = () => {
-    if (window.confirm('Are you sure you want to delete ALL suggestions data?')) {
-      localStorage.removeItem(STORAGE_KEY);
-      setSuggestions([]);
+    try {
+      await feedbackApi.respondToSuggestion(suggestionId, responseText);
+      setResponseText('');
+      setRespondingTo(null);
+      loadSuggestions();
+    } catch (error) {
+      console.error("Failed to respond to suggestion:", error);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Debug button - remove in production */}
-      {isAdmin && (
-        <button 
-          onClick={clearAllData}
-          className="mb-4 text-sm bg-red-500 text-white px-3 py-1 rounded"
-        >
-          Clear All Data (Admin Only)
-        </button>
-      )}
-
-      <h1 className="text-2xl font-bold mb-6 flex items-center">
-        <MessageSquare className="mr-2" /> 
-        {isAdmin ? 'Employee Feedback' : 'Suggestions & Complaints'}
-      </h1>
-
-      {/* Employee Form */}
-      {isAuthenticated && !isAdmin && (
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Submit Feedback</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="flex space-x-4 mb-4">
-              <label className="flex items-center">
+    <div className="container mx-auto p-4 max-w-4xl">
+      <h1 className="text-2xl font-bold mb-6">Suggestions & Complaints</h1>
+      
+      {isAuthenticated && (
+        <form onSubmit={handleSubmit} className="mb-6">
+          <div className="flex flex-col space-y-4">
+            <div className="flex space-x-4">
+              <label className="inline-flex items-center">
                 <input
                   type="radio"
+                  className="form-radio"
+                  name="type"
                   checked={suggestionType === 'suggestion'}
                   onChange={() => setSuggestionType('suggestion')}
-                  className="mr-2"
                 />
-                Suggestion
+                <span className="ml-2">Suggestion</span>
               </label>
-              <label className="flex items-center">
+              <label className="inline-flex items-center">
                 <input
                   type="radio"
+                  className="form-radio"
+                  name="type"
                   checked={suggestionType === 'complaint'}
                   onChange={() => setSuggestionType('complaint')}
-                  className="mr-2"
                 />
-                Complaint
+                <span className="ml-2">Complaint</span>
               </label>
             </div>
+            
             <textarea
+              className="w-full p-3 border rounded"
+              rows={3}
+              placeholder={`Enter your ${suggestionType} here...`}
               value={newSuggestion}
               onChange={(e) => setNewSuggestion(e.target.value)}
-              placeholder={`Type your ${suggestionType} here...`}
-              className="w-full p-3 border rounded-lg mb-3 min-h-[120px]"
-              required
             />
+            
             <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 self-end"
             >
-              <Send className="mr-2" size={16} /> Submit
+              Submit
             </button>
-          </form>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex border-b mb-4 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`px-4 py-2 whitespace-nowrap ${activeTab === 'all' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
-        >
-          All
-        </button>
-        {isAdmin && (
-          <>
-            <button
-              onClick={() => setActiveTab('pending')}
-              className={`px-4 py-2 whitespace-nowrap ${activeTab === 'pending' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
-            >
-              Pending
-            </button>
-            <button
-              onClick={() => setActiveTab('suggestions')}
-              className={`px-4 py-2 whitespace-nowrap ${activeTab === 'suggestions' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
-            >
-              Suggestions
-            </button>
-            <button
-              onClick={() => setActiveTab('complaints')}
-              className={`px-4 py-2 whitespace-nowrap ${activeTab === 'complaints' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
-            >
-              Complaints
-            </button>
-          </>
-        )}
-        <button
-          onClick={() => setActiveTab('responded')}
-          className={`px-4 py-2 whitespace-nowrap ${activeTab === 'responded' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
-        >
-          Responded
-        </button>
-        {isAuthenticated && !isAdmin && (
-          <button
-            onClick={() => setActiveTab('mine')}
-            className={`px-4 py-2 whitespace-nowrap ${activeTab === 'mine' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
-          >
-            My Submissions
-          </button>
-        )}
-      </div>
-
-      {/* Suggestions List */}
-      <div className="space-y-4">
-        {filteredSuggestions.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <AlertCircle className="mx-auto mb-2" />
-            No {activeTab === 'all' ? 'feedback' : activeTab} found
           </div>
-        ) : (
-          filteredSuggestions.map((suggestion) => (
-            <div 
-              key={suggestion.id} 
-              className={`bg-white rounded-lg shadow p-4 border-l-4 ${
-                suggestion.type === 'complaint' 
-                  ? 'border-red-500' 
-                  : 'border-blue-500'
-              }`}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h3 className="font-medium">{suggestion.employeeName}</h3>
-                  <p className="text-sm text-gray-500">
-                    {suggestion.date.toLocaleString()} • 
-                    <span className={`ml-2 capitalize ${
-                      suggestion.type === 'complaint' 
-                        ? 'text-red-600' 
-                        : 'text-blue-600'
-                    }`}>
-                      {suggestion.type}
-                    </span>
-                  </p>
+        </form>
+      )}
+      
+      <div className="border rounded-lg overflow-hidden">
+        <div className="flex border-b">
+          <button
+            className={`px-4 py-2 ${activeTab === 'all' ? 'bg-gray-100 font-medium' : ''}`}
+            onClick={() => setActiveTab('all')}
+          >
+            All
+          </button>
+          {isAdmin && (
+            <>
+              <button
+                className={`px-4 py-2 ${activeTab === 'pending' ? 'bg-gray-100 font-medium' : ''}`}
+                onClick={() => setActiveTab('pending')}
+              >
+                Pending
+              </button>
+              <button
+                className={`px-4 py-2 ${activeTab === 'responded' ? 'bg-gray-100 font-medium' : ''}`}
+                onClick={() => setActiveTab('responded')}
+              >
+                Responded
+              </button>
+            </>
+          )}
+        </div>
+        
+        <div className="divide-y">
+          {suggestions.length === 0 ? (
+            <p className="p-4 text-center text-gray-500">No suggestions found</p>
+          ) : (
+            suggestions.map((suggestion) => (
+              <div key={suggestion.id} className="p-4">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="font-medium">
+                      {suggestion.senderName || 'Anonymous'}
+                      <span className="ml-2 text-sm text-gray-500">
+                        {new Date(suggestion.createdAt).toLocaleString()}
+                      </span>
+                    </p>
+                    <p className="mt-1">{suggestion.content}</p>
+                  </div>
+                  <span className="text-xs px-2 py-1 bg-gray-100 rounded-full">
+                    {suggestion.type === 'SUGGESTION' ? 'Suggestion' : 'Complaint'}
+                  </span>
                 </div>
-                <span className={`px-2 py-1 text-xs rounded-full ${
-                  suggestion.status === 'pending' 
-                    ? 'bg-yellow-100 text-yellow-800' 
-                    : 'bg-green-100 text-green-800'
-                }`}>
-                  {suggestion.status}
-                </span>
-              </div>
-              <p className="mb-3 whitespace-pre-line">{suggestion.text}</p>
-
-              {suggestion.response && (
-                <div className="bg-blue-50 p-3 rounded-lg mb-3">
-                  <div className="flex justify-between items-start mb-1">
-                    <h4 className="font-medium text-blue-800">Admin Response</h4>
-                    <p className="text-sm text-blue-600">
-                      {suggestion.responseDate.toLocaleString()}
+                
+                {suggestion.response && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded">
+                    <p className="font-medium text-gray-700">Admin Response:</p>
+                    <p className="mt-1">{suggestion.response}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(suggestion.responseAt).toLocaleString()}
                     </p>
                   </div>
-                  <p className="text-blue-700 whitespace-pre-line">{suggestion.response}</p>
-                </div>
-              )}
-
-              {isAdmin && suggestion.status === 'pending' && (
-                <div className="mt-3">
-                  {respondingTo === suggestion.id ? (
-                    <div>
-                      <textarea
-                        value={responseText}
-                        onChange={(e) => setResponseText(e.target.value)}
-                        placeholder="Type your response here..."
-                        className="w-full p-3 border rounded-lg mb-2 min-h-[100px]"
-                      />
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleRespond(suggestion.id)}
-                          className="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 flex items-center"
-                        >
-                          <Check className="mr-1" size={16} /> Submit Response
-                        </button>
-                        <button
-                          onClick={() => setRespondingTo(null)}
-                          className="bg-gray-200 px-3 py-1 rounded-lg hover:bg-gray-300 flex items-center"
-                        >
-                          <X className="mr-1" size={16} /> Cancel
-                        </button>
+                )}
+                
+                {isAdmin && !suggestion.response && (
+                  <div className="mt-3">
+                    {respondingTo === suggestion.id ? (
+                      <div className="flex flex-col space-y-2">
+                        <textarea
+                          className="w-full p-2 border rounded"
+                          rows={2}
+                          placeholder="Enter your response..."
+                          value={responseText}
+                          onChange={(e) => setResponseText(e.target.value)}
+                        />
+                        <div className="flex space-x-2 justify-end">
+                          <button
+                            className="px-3 py-1 bg-gray-200 rounded"
+                            onClick={() => setRespondingTo(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="px-3 py-1 bg-blue-500 text-white rounded"
+                            onClick={() => handleRespond(suggestion.id)}
+                          >
+                            Submit Response
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setRespondingTo(suggestion.id)}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      Respond to this {suggestion.type}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))
-        )}
+                    ) : (
+                      <button
+                        className="text-sm text-blue-500 hover:text-blue-700"
+                        onClick={() => setRespondingTo(suggestion.id)}
+                      >
+                        Respond
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,53 +1,51 @@
+"use client"
 
 import { useState, useEffect, useRef } from "react"
 import { employeeMenuApi } from "./api"
-import { ChevronLeft, ChevronRight, Utensils, ChefHat, Coffee, Sparkles, Star } from "lucide-react"
+import api from "./api"
+import { useAuth } from "./AuthContext"
+import ViewCart from "./ViewCart"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Utensils,
+  ChefHat,
+  Coffee,
+  Star,
+  CheckCircle,
+  X,
+  Minus,
+  Plus,
+  Loader,
+  ShoppingCart,
+  Sparkles,
+} from "lucide-react"
 
-const topItems = [
-  {
-    id: 1,
-    name: "Special Biryani",
-    image:
-      "https://images.unsplash.com/photo-1642821373181-696a54913e93?w=1000&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YnJpeWFuaXxlbnwwfHwwfHx8MA%3D%3D",
-    price: "₹120",
-    description: "Aromatic basmati rice with indian spices",
-  },
-  {
-    id: 2,
-    name: "Bhel",
-    image:
-      "https://images.unsplash.com/photo-1643892548578-d0a056dd2ee5?w=1000&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YmhlbHxlbnwwfHwwfHx8MA%3D%3D",
-    price: "₹25",
-    description: "puffed rice as its base, combined with a variety of vegies",
-  },
-  {
-    id: 3,
-    name: "Masala Dosa",
-    image:
-      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=1000&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8ZG9zYXxlbnwwfHwwfHx8MA%3D%3D",
-    price: "₹80",
-    description: "Crispy dosa with spiced potato filling",
-  },
-  {
-    id: 4,
-    name: "Chai",
-    image:
-      "https://images.unsplash.com/photo-1630748662359-40a2105640c7?w=1000&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y2hhaXxlbnwwfHwwfHx8MA%3D%3D",
-    price: "₹10",
-    description: "Made with milk and chai patti powder",
-  },
-]
-
-export default function CanteenHomePage() {
-  const [currentSlide, setCurrentSlide] = useState(0)
+export default function ModernCanteenHomepage() {
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [todayMenuSlide, setTodayMenuSlide] = useState(0)
-  const [hamburgerMenuOpen, setHamburgerMenuOpen] = useState(false)
   const [todayMenu, setTodayMenu] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [scrollY, setScrollY] = useState(0)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+
+  // Cart and ordering functionality
+  const [cartItems, setCartItems] = useState([])
+  const [pendingCartItems, setPendingCartItems] = useState([])
+  const [showCart, setShowCart] = useState(false)
+  const [cartLoading, setCartLoading] = useState(false)
+  const [showOrderDialog, setShowOrderDialog] = useState(false)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [orderQuantity, setOrderQuantity] = useState(1)
+  const [orderRemarks, setOrderRemarks] = useState("")
+  const [orderingItem, setOrderingItem] = useState(null)
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false)
+  const [orderSuccessData, setOrderSuccessData] = useState(null)
+
+  // Authentication context
+  const { employee, isAdmin, admin } = useAuth()
 
   // Track the current day to prevent unnecessary refetches
   const currentDayRef = useRef(null)
@@ -64,6 +62,48 @@ export default function CanteenHomePage() {
       setCurrentTime(new Date())
     }, 1000)
     return () => clearInterval(timer)
+  }, [])
+
+  // Load cart items
+  const loadCartItems = async () => {
+    try {
+      setCartLoading(true)
+      const employeeId = employee?.employeeId || (isAdmin ? admin?.employeeId : null)
+
+      if (!employeeId) {
+        setCartItems([])
+        return
+      }
+
+      console.log("Loading cart for e`mployee:", employeeId)
+      const response = await api.get(`/api/orders/pending/${employeeId}`)
+      console.log("Cart response:", response.data)
+
+      // Enhanced data structure with proper cart item format
+      const items = Array.isArray(response.data)
+        ? response.data.map((item) => ({
+            ...item,
+            itemName: item.itemName || item.name || "Unknown Item",
+            priceAtOrder: Number.parseFloat(item.priceAtOrder || item.price || 0),
+            quantity: Number.parseInt(item.quantity || 1),
+            totalPrice: Number.parseFloat(item.priceAtOrder || item.price || 0) * Number.parseInt(item.quantity || 1),
+            status: item.status || "PENDING",
+            category: item.category || "general",
+          }))
+        : []
+
+      setCartItems(items)
+    } catch (err) {
+      console.error("Failed to load cart items:", err)
+      setCartItems([])
+    } finally {
+      setCartLoading(false)
+    }
+  }
+
+  // Load cart items on mount
+  useEffect(() => {
+    loadCartItems()
   }, [])
 
   useEffect(() => {
@@ -90,9 +130,15 @@ export default function CanteenHomePage() {
             acc[item.category] = []
           }
           acc[item.category].push({
+            id: item.id,
+            menuId: item.menuId,
             name: item.name,
             price: item.price,
             available: item.isActive,
+            category: item.category,
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
           })
           return acc
         }, {})
@@ -121,14 +167,6 @@ export default function CanteenHomePage() {
     return days[currentTime.getDay()]
   }
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % topItems.length)
-  }
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + topItems.length) % topItems.length)
-  }
-
   const nextTodayMenuSlide = () => {
     setTodayMenuSlide((prev) => (prev + 1) % Math.ceil(todayMenu.length / 2))
   }
@@ -149,6 +187,181 @@ export default function CanteenHomePage() {
       default:
         return <Coffee className="w-5 h-5" />
     }
+  }
+
+  const openImageModal = (item) => {
+    setSelectedImage(item)
+    setIsImageModalOpen(true)
+  }
+
+  const closeImageModal = () => {
+    setSelectedImage(null)
+    setIsImageModalOpen(false)
+  }
+
+  // Handle opening order dialog
+  const handleOpenOrderDialog = (item) => {
+    if (!item.available) return
+    setSelectedItem(item)
+    setOrderQuantity(1)
+    setOrderRemarks("")
+    setShowOrderDialog(true)
+  }
+
+  // Handle adding item to cart
+  const handleAddToCart = async () => {
+    if (!selectedItem) return
+
+    try {
+      setOrderingItem(selectedItem.id)
+
+      const employeeId = employee?.employeeId || (isAdmin ? admin?.employeeId : null)
+
+      if (!employeeId) {
+        throw new Error("Employee ID not available")
+      }
+
+      // Create cart item instead of placing order immediately
+      const cartItem = {
+        id: Date.now(), // Temporary ID for cart item
+        menuId: selectedItem.menuId,
+        itemName: selectedItem.name,
+        category: selectedItem.category,
+        priceAtOrder: selectedItem.price,
+        quantity: orderQuantity,
+        totalPrice: selectedItem.price * orderQuantity,
+        remarks: orderRemarks,
+        employeeId,
+        status: "CART", // Special status for cart items
+        expectedDeliveryDate: new Date().toISOString().split("T")[0],
+      }
+
+      setPendingCartItems((prev) => [...prev, cartItem])
+
+      setOrderSuccessData({
+        itemName: selectedItem.name,
+        orderId: `CART-${Date.now()}`,
+        quantity: orderQuantity,
+        price: selectedItem.price,
+        totalPrice: selectedItem.price * orderQuantity,
+      })
+
+      setShowOrderSuccess(true)
+      setShowOrderDialog(false)
+    } catch (err) {
+      alert(`Failed to add to cart: ${err.message}`)
+    } finally {
+      setOrderingItem(null)
+    }
+  }
+
+  // Handle direct order now for top items
+  const handleOrderNow = async (item) => {
+    try {
+      setOrderingItem(item.id)
+      const employeeId = employee?.employeeId || (isAdmin ? admin?.employeeId : null)
+
+      if (!employeeId) {
+        alert("Please log in to place an order")
+        return
+      }
+
+      // Find matching menu item from today's menu
+      const menuItem = todayMenu.flatMap((category) => category.items).find((menuItem) => menuItem.name === item.name)
+
+      if (!menuItem || !menuItem.available) {
+        alert("This item is currently unavailable")
+        return
+      }
+
+      // Create cart item for top items
+      const cartItem = {
+        id: Date.now(),
+        menuId: menuItem.menuId || 1,
+        itemName: item.name,
+        category: menuItem.category || "special",
+        priceAtOrder: Number.parseFloat(item.price.replace("₹", "")),
+        quantity: 1,
+        totalPrice: Number.parseFloat(item.price.replace("₹", "")),
+        remarks: `Quick order from homepage - ${item.name}`,
+        employeeId,
+        status: "CART",
+        expectedDeliveryDate: new Date().toISOString().split("T")[0],
+      }
+
+      setPendingCartItems((prev) => [...prev, cartItem])
+
+      setOrderSuccessData({
+        itemName: item.name,
+        orderId: `CART-${Date.now()}`,
+        quantity: 1,
+        price: Number.parseFloat(item.price.replace("₹", "")),
+        totalPrice: Number.parseFloat(item.price.replace("₹", "")),
+      })
+
+      setShowOrderSuccess(true)
+    } catch (err) {
+      console.error("Order error:", err)
+      alert(`Failed to add to cart: ${err.message}`)
+    } finally {
+      setOrderingItem(null)
+    }
+  }
+
+  // Place all cart items as orders
+  const handlePlaceAllOrders = async () => {
+    if (pendingCartItems.length === 0) return
+
+    try {
+      setCartLoading(true)
+      const orderPromises = pendingCartItems.map((item) =>
+        api.post("/api/orders", {
+          employeeId: item.employeeId,
+          menuId: item.menuId,
+          quantity: item.quantity,
+          expectedDeliveryDate: item.expectedDeliveryDate,
+          remarks: item.remarks,
+        }),
+      )
+
+      await Promise.all(orderPromises)
+
+      // Clear pending cart and refresh actual orders
+      setPendingCartItems([])
+      await loadCartItems()
+
+      alert(`Successfully placed ${pendingCartItems.length} orders!`)
+      setShowCart(false)
+    } catch (err) {
+      alert(`Failed to place orders: ${err.response?.data?.message || err.message}`)
+    } finally {
+      setCartLoading(false)
+    }
+  }
+
+  // Remove items from pending cart
+  const handleRemoveFromCart = (cartItemId) => {
+    setPendingCartItems((prev) => prev.filter((item) => item.id !== cartItemId))
+  }
+
+  // Handle canceling order from cart
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return
+
+    try {
+      await api.delete(`/api/orders/${orderId}`)
+      loadCartItems() // Refresh cart
+    } catch (err) {
+      alert(`Failed to cancel order: ${err.response?.data?.message || err.message}`)
+    }
+  }
+
+  // Get cart notification text
+  const getCartNotificationText = () => {
+    const totalCount = pendingCartItems.length + cartItems.length
+    if (totalCount === 0) return "View Cart"
+    if (totalCount === 1) return "1 item in cart"
+    return `${totalCount} items in cart`
   }
 
   return (
@@ -176,10 +389,10 @@ export default function CanteenHomePage() {
             key={i}
             className="absolute animate-float"
             style={{
-              left:` ${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
               animationDelay: `${Math.random() * 3}s`,
-              animationDuration:` ${3 + Math.random() * 2}s`,
+              animationDuration: `${3 + Math.random() * 2}s`,
             }}
           >
             <Sparkles className="w-4 h-4 text-blue-300 opacity-60" />
@@ -195,6 +408,23 @@ export default function CanteenHomePage() {
         ></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          {/* Header with Cart Button */}
+          <div className="flex justify-between items-center mb-8">
+            <div></div>
+            <button
+              onClick={() => setShowCart(true)}
+              className="relative bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-white/30 transition-all shadow-lg hover:shadow-xl"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {getCartNotificationText()}
+              {pendingCartItems.length + cartItems.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                  {pendingCartItems.length + cartItems.length}
+                </span>
+              )}
+            </button>
+          </div>
+
           {/* Animated Welcome Text with Gradient Mask */}
           <div className="relative mb-6">
             <h2 className="text-6xl md:text-7xl font-bold mb-4 relative">
@@ -209,17 +439,6 @@ export default function CanteenHomePage() {
               <div className="absolute -inset-1 bg-gradient-to-r from-yellow-300 via-orange-300 to-red-300 rounded-lg blur opacity-20 animate-pulse"></div>
             </h1>
           </div>
-
-          <p className="text-xl md:text-2xl text-blue-100 mb-8 animate-fade-in-up animation-delay-2000">
-            Serving fresh, delicious meals every day
-          </p>
-
-          {/* Animated CTA Button */}
-          <button className="group relative px-8 py-4 bg-gradient-to-r from-orange-400 to-red-500 text-white font-bold rounded-full text-lg shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300 animate-bounce-in animation-delay-3000">
-            <span className="relative z-10">Explore Menu</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-full blur opacity-30 group-hover:opacity-100 transition-opacity duration-300"></div>
-          </button>
         </div>
 
         {/* Animated Wave */}
@@ -240,133 +459,6 @@ export default function CanteenHomePage() {
               className="fill-white animate-wave animation-delay-2000"
             ></path>
           </svg>
-        </div>
-      </section>
-
-      {/* Top Items Slider with Flip Animation */}
-      <section className="py-20 bg-white relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h3 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4 animate-fade-in-up">
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Top Items
-              </span>
-            </h3>
-            <p className="text-xl text-slate-600 animate-fade-in-up animation-delay-500">
-              Our most popular and delicious dishes
-            </p>
-            <div className="w-24 h-1 bg-gradient-to-r from-blue-500 to-purple-500 mx-auto mt-4 rounded-full animate-scale-in animation-delay-1000"></div>
-          </div>
-
-          <div className="relative">
-            <div className="overflow-hidden rounded-2xl shadow-2xl">
-              <div
-                className="flex transition-transform duration-700 ease-in-out"
-                style={{ transform: `translateX(-${currentSlide * 100}%)` }}
-              >
-                {topItems.map((item, index) => (
-                  <div key={item.id} className="w-full flex-shrink-0">
-                    <div className="grid md:grid-cols-2 gap-0 h-[600px]">
-                      {/* Image with Flip Animation */}
-                      <div className="relative group h-full perspective-1000">
-                        <div className="relative w-full h-full transform-style-preserve-3d transition-transform duration-700 group-hover:rotate-y-180">
-                          {/* Front */}
-                          <div className="absolute inset-0 backface-hidden">
-                            <img
-                              src={item.image || "/placeholder.svg"}
-                              alt={item.name}
-                              className="w-full h-full object-cover rounded-l-2xl"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent rounded-l-2xl"></div>
-                            <div className="absolute bottom-4 left-4 text-white">
-                              <div className="flex items-center space-x-2">
-                                <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                                <span className="text-sm font-medium">Popular Choice</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Back */}
-                          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-blue-500 to-purple-600 rounded-l-2xl flex items-center justify-center">
-                            <div className="text-center text-white p-8">
-                              <ChefHat className="w-16 h-16 mx-auto mb-4 animate-bounce" />
-                              <h4 className="text-2xl font-bold mb-2">Chef's Special</h4>
-                              <p className="text-blue-100">Prepared with love and finest ingredients</p>
-                              <div className="mt-4 flex justify-center space-x-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star key={i} className="w-4 h-4 text-yellow-300 fill-current" />
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Content with Enhanced Animation */}
-                      <div className="bg-gradient-to-br from-slate-50 via-white to-blue-50 p-12 flex flex-col justify-center rounded-r-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-200 to-purple-200 rounded-full -translate-y-16 translate-x-16 opacity-20"></div>
-                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-br from-orange-200 to-red-200 rounded-full translate-y-12 -translate-x-12 opacity-20"></div>
-
-                        <div className="relative z-10 space-y-6">
-                          <h4 className="text-3xl md:text-4xl font-bold text-slate-800 animate-slide-in-right">
-                            {item.name}
-                          </h4>
-                          <p className="text-lg text-slate-600 leading-relaxed animate-slide-in-right animation-delay-300">
-                            {item.description}
-                          </p>
-                          <div className="flex items-center justify-between pt-6 animate-slide-in-right animation-delay-600">
-                            <span className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                              {item.price}
-                            </span>
-                            <button className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300 overflow-hidden">
-                              <span className="relative z-10 flex items-center space-x-2">
-                                <span>Order Now</span>
-                                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-                              </span>
-                              <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Enhanced Navigation Arrows */}
-            <button
-              onClick={prevSlide}
-              className="absolute left-6 top-1/2 transform -translate-y-1/2 bg-white/90 backdrop-blur-sm hover:bg-white shadow-xl hover:shadow-2xl hover:scale-110 transition-all duration-300 p-4 rounded-full z-10 group"
-            >
-              <ChevronLeft className="w-6 h-6 text-slate-600 group-hover:text-blue-600 transition-colors duration-300" />
-            </button>
-            <button
-              onClick={nextSlide}
-              className="absolute right-6 top-1/2 transform -translate-y-1/2 bg-white/90 backdrop-blur-sm hover:bg-white shadow-xl hover:shadow-2xl hover:scale-110 transition-all duration-300 p-4 rounded-full z-10 group"
-            >
-              <ChevronRight className="w-6 h-6 text-slate-600 group-hover:text-blue-600 transition-colors duration-300" />
-            </button>
-
-            {/* Enhanced Dots Indicator */}
-            <div className="flex justify-center space-x-3 mt-8">
-              {topItems.map((_, index) => (
-                <button
-                  key={index}
-                  className={`relative transition-all duration-300 ${
-                    index === currentSlide
-                      ? "w-12 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
-                      : "w-3 h-3 bg-slate-300 hover:bg-slate-400 rounded-full hover:scale-125"
-                  }`}
-                  onClick={() => setCurrentSlide(index)}
-                >
-                  {index === currentSlide && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </section>
 
@@ -467,7 +559,10 @@ export default function CanteenHomePage() {
                                         {item.available ? "Available" : "Sold Out"}
                                       </span>
                                       {item.available && (
-                                        <button className="opacity-0 group-hover/item:opacity-100 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-300">
+                                        <button
+                                          onClick={() => handleOpenOrderDialog(item)}
+                                          className="opacity-0 group-hover/item:opacity-100 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                                        >
                                           Add
                                         </button>
                                       )}
@@ -529,6 +624,213 @@ export default function CanteenHomePage() {
           )}
         </div>
       </section>
+
+      {/* Enhanced Image Modal with Cover Opening Effect */}
+      {isImageModalOpen && selectedImage && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="relative max-w-5xl max-h-[95vh] w-full">
+            <button
+              onClick={closeImageModal}
+              className="absolute -top-16 right-0 text-white hover:text-red-400 transition-colors duration-300 z-10 bg-white/10 rounded-full p-2 backdrop-blur-sm"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="bg-gradient-to-br from-white via-blue-50 to-purple-50 rounded-3xl overflow-hidden shadow-2xl transform animate-modal-open border-4 border-white/20">
+              <div className="relative">
+                <div className="aspect-video relative overflow-hidden">
+                  <img
+                    src={selectedImage.image || "/placeholder.svg"}
+                    alt={selectedImage.name}
+                    className="w-full h-full object-cover transform animate-zoom-in"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                  <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2">
+                    <div className="flex items-center space-x-2">
+                      <Star className="w-5 h-5 text-yellow-500 fill-current" />
+                      <span className="text-sm font-bold text-gray-800">Premium Dish</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-8 relative">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-200/30 to-purple-200/30 rounded-full -translate-y-16 translate-x-16"></div>
+                  <h3 className="text-4xl font-bold text-slate-800 mb-4 animate-slide-in-right">
+                    {selectedImage.name}
+                  </h3>
+                  <p className="text-lg text-slate-600 mb-6 leading-relaxed animate-slide-in-right animation-delay-300">
+                    {selectedImage.description}
+                  </p>
+                  <div className="flex items-center justify-between animate-slide-in-right animation-delay-600">
+                    <span className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      {selectedImage.price}
+                    </span>
+                    <button
+                      onClick={() => handleOrderNow(selectedImage)}
+                      disabled={orderingItem === selectedImage?.id}
+                      className="group relative px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-110 transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="relative z-10 flex items-center space-x-3">
+                        <span>{orderingItem === selectedImage?.id ? "Adding..." : "Add to Cart"}</span>
+                        <ChefHat className="w-6 h-6 group-hover:rotate-12 transition-transform duration-300" />
+                      </span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Dialog */}
+      {showOrderDialog && selectedItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-900">Add to Cart</h3>
+              <button
+                onClick={() => setShowOrderDialog(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Item Details */}
+            <div className="mb-6">
+              <div className="flex items-center mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-teal-50 to-blue-50 rounded-lg flex items-center justify-center mr-4">
+                  {getCategoryIcon(selectedItem.category)}
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900">{selectedItem.name}</h4>
+                  <p className="text-blue-500 font-bold text-xl">₹{selectedItem.price}</p>
+                </div>
+              </div>
+              {selectedItem.description && <p className="text-gray-600 text-sm">{selectedItem.description}</p>}
+            </div>
+
+            {/* Quantity Selector */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+              <div className="flex items-center justify-center space-x-4">
+                <button
+                  onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))}
+                  className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="text-2xl font-bold text-gray-900 w-12 text-center">{orderQuantity}</span>
+                <button
+                  onClick={() => setOrderQuantity(orderQuantity + 1)}
+                  className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center hover:bg-teal-200 transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-teal-600" />
+                </button>
+              </div>
+            </div>
+
+            {/* Special Instructions */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Special Instructions (Optional)</label>
+              <textarea
+                value={orderRemarks}
+                onChange={(e) => setOrderRemarks(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                rows={3}
+                placeholder="Any special requests..."
+              />
+            </div>
+
+            {/* Total and Actions */}
+            <div className="border-t pt-4">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-lg font-medium text-gray-700">Total:</span>
+                <span className="text-2xl font-bold text-blue-600">
+                  ₹{(selectedItem.price * orderQuantity).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowOrderDialog(false)}
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddToCart}
+                  disabled={orderingItem === selectedItem.id}
+                  className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {orderingItem === selectedItem.id ? (
+                    <>
+                      <Loader className="animate-spin w-4 h-4 mr-2" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      Add to Cart
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ViewCart Component */}
+      {showCart && (
+        <ViewCart
+          cartItems={cartItems}
+          pendingCartItems={pendingCartItems}
+          onRemoveFromCart={handleRemoveFromCart}
+          onPlaceAllOrders={handlePlaceAllOrders}
+          onCancelOrder={handleCancelOrder}
+          cartLoading={cartLoading}
+          onClose={() => setShowCart(false)}
+        />
+      )}
+
+      {/* Order Success Modal */}
+      {showOrderSuccess && orderSuccessData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-sm mx-4 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Added to Cart!</h3>
+            <div className="text-gray-600 mb-4">
+              <p className="mb-2">
+                {orderSuccessData.quantity}x {orderSuccessData.itemName}
+              </p>
+              <p className="text-lg font-semibold text-blue-600">Total: ₹{orderSuccessData.totalPrice?.toFixed(2)}</p>
+              <p className="text-sm text-gray-500 mt-2">Cart ID: #{orderSuccessData.orderId}</p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowOrderSuccess(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+              >
+                Continue Shopping
+              </button>
+              <button
+                onClick={() => {
+                  setShowOrderSuccess(false)
+                  setShowCart(true)
+                }}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all"
+              >
+                View Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes gradient-x {
@@ -615,6 +917,31 @@ export default function CanteenHomePage() {
           20%, 40%, 60%, 80% { transform: translateX(10px); }
         }
 
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes modal-open {
+          0% {
+            opacity: 0;
+            transform: scale(0.8) rotateY(-15deg);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) rotateY(0deg);
+          }
+        }
+
+        @keyframes zoom-in {
+          0% {
+            transform: scale(1.2);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+
         .animate-gradient-x {
           animation: gradient-x 3s ease infinite;
         }
@@ -649,6 +976,18 @@ export default function CanteenHomePage() {
 
         .animate-shake {
           animation: shake 0.5s ease-in-out;
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+
+        .animate-modal-open {
+          animation: modal-open 0.6s ease-out;
+        }
+
+        .animate-zoom-in {
+          animation: zoom-in 0.8s ease-out;
         }
 
         .animation-delay-150 {

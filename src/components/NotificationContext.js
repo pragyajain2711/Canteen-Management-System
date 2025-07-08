@@ -1,55 +1,118 @@
-// NotificationContext.js
-import { createContext, useState, useEffect, useContext } from "react";
+import { createContext, useState, useEffect, useContext, useMemo } from "react";
+import { feedbackApi } from "./api";
+import { AuthContext } from "./AuthContext";
 
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [message, setMessage] = useState(null);
+  const { employee, isAdmin } = useContext(AuthContext);
 
-  // Load notifications from localStorage on initial render
-  useEffect(() => {
-    const savedNotifications = localStorage.getItem('notifications');
-    if (savedNotifications) {
-      setNotifications(JSON.parse(savedNotifications).map(n => ({
-        ...n,
-        timestamp: new Date(n.timestamp)
-      })));
-    }
-  }, []);
+  const employeeMemo = useMemo(() => employee, [employee?.employeeId]);
 
-  // Save notifications to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('notifications', JSON.stringify(notifications));
-  }, [notifications]);
+  // Store cleared time in localStorage
+  const [lastClearedAt, setLastClearedAt] = useState(() => {
+    return localStorage.getItem("lastClearedAt") || null;
+  });
 
-  const addNotification = (message) => {
-    const newNotification = {
-      id: Date.now(),
-      message,
-      timestamp: new Date(),
-      read: false,
-      isAdminNotification: true // Mark as admin-generated
-    };
-    setNotifications(prev => [newNotification, ...prev]);
+  const showMessage = (text, isError = false) => {
+    setMessage({ text, isError });
+    setTimeout(() => setMessage(null), 3000);
   };
 
-  const markAsRead = (id) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? {...n, read: true} : n)
-    );
+  const loadNotifications = async () => {
+    try {
+      const response = await feedbackApi.getMyNotifications();
+      let data = response.data.filter(n => !lastClearedAt || new Date(n.createdAt) > new Date(lastClearedAt));
+
+      // If admin, group by content + timestamp to remove duplicates
+      if (isAdmin) {
+        const grouped = new Map();
+
+        data.forEach(n => {
+          const key = `${n.title}|${n.content}|${new Date(n.createdAt).toISOString().slice(0, 16)}`;
+          if (!grouped.has(key)) {
+            grouped.set(key, n); // Keep the first one
+          }
+        });
+
+        data = Array.from(grouped.values());
+      }
+
+      const sorted = data
+        .map(n => ({
+          ...n,
+          isRead: n.status === 'READ',
+          senderName: n.senderName || (n.senderId === employeeMemo?.employeeId ? 'You' : 'System')
+        }))
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      setNotifications(sorted);
+      setUnreadCount(sorted.filter(n => !n.isRead).length);
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+      showMessage("Failed to load notifications", true);
+    }
+  };
+
+  useEffect(() => {
+    if (employeeMemo) {
+      loadNotifications();
+      const interval = setInterval(loadNotifications, 30000); // Poll every 30s
+      return () => clearInterval(interval);
+    }
+  }, [employeeMemo, lastClearedAt]);
+
+  const markAsRead = async (id) => {
+    try {
+      await feedbackApi.markAsRead(id);
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, isRead: true } : n)
+      );
+      setUnreadCount(prev => prev - 1);
+    } catch (error) {
+      console.error("Failed to mark as read:", error);
+      showMessage("Failed to mark as read", true);
+    }
   };
 
   const clearNotifications = () => {
+    if (!isAdmin) {
+      const hasUnread = notifications.some(n => !n.isRead);
+      if (hasUnread) {
+        showMessage("Cannot clear - not all notifications are read", true);
+        return;
+      }
+    }
+
+    const now = new Date().toISOString();
+    localStorage.setItem("lastClearedAt", now);
+    setLastClearedAt(now);
     setNotifications([]);
+    setUnreadCount(0);
+    showMessage("Notifications cleared");
+  };
+
+  const resetNotificationHistory = () => {
+    localStorage.removeItem("lastClearedAt");
+    setLastClearedAt(null);
+    showMessage("Notification history reset.");
+    loadNotifications();
   };
 
   return (
-    <NotificationContext.Provider 
-      value={{ 
-        notifications, 
-        addNotification, 
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        unreadCount,
         markAsRead,
-        clearNotifications 
+        clearNotifications,
+        refreshNotifications: loadNotifications,
+        resetNotificationHistory,
+        message,
+        showMessage
       }}
     >
       {children}

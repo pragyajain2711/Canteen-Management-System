@@ -1,3 +1,5 @@
+"use client"
+
 import { useState } from "react"
 import {
   Search,
@@ -41,19 +43,6 @@ const categoryConfig = {
   lunch: { color: "bg-green-100 text-green-800", icon: "🍽️" },
   snacks: { color: "bg-purple-100 text-purple-800", icon: "🍿" },
   beverages: { color: "bg-blue-100 text-blue-800", icon: "☕" },
-}
-
-function formatDateTime(dateString) {
-  if (!dateString) return ""
-  const date = new Date(dateString)
-  return date.toLocaleString("en-IN", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
 }
 
 export default function AdminOrderHistory() {
@@ -100,22 +89,25 @@ export default function AdminOrderHistory() {
   const fetchPriceHistory = async (orderId) => {
     try {
       const { data } = await orderApi.getOrderPriceHistory(orderId)
-      setPriceHistory(data)
+      // Transform the data if needed
+      const transformedData = data.map((item) => ({
+        ...item,
+        price: item.price || item.currentPrice, // fallback to currentPrice if price not available
+        startDate: item.startDate || item.createdAt, // fallback to createdAt if startDate not available
+        isActive: item.isActive || item.wasActive, // handle different field names
+      }))
+      setPriceHistory(transformedData)
     } catch (err) {
       console.error("Failed to fetch price history:", err)
+      setPriceHistory([]) // Set empty array on error
     }
   }
 
   const normalizedOrders =
     rawOrders?.map((order) => ({
       ...order,
-      employeeId: String(order.employee?.employee_id || order.employee?.employeeId || order.employee?.id || ""),
-      employeeName: String(
-        order.employee?.name ||
-          order.employee?.fullName ||
-          order.employee?.firstName + " " + order.employee?.lastName ||
-          "",
-      ).trim(),
+      employeeId: String(order.employee?.id || order.employee?.employeeId || ""),
+      employeeName: String(order.employee?.name || order.employee?.fullName || ""),
       employeeDepartment: String(order.employee?.department || ""),
       employeeEmail: String(order.employee?.email || ""),
       menuItemName: String(order.menuItem?.name || ""),
@@ -127,11 +119,12 @@ export default function AdminOrderHistory() {
 
   const filteredOrders = normalizedOrders.filter((order) => {
     const searchLower = searchTerm.toLowerCase().trim()
-    const employeeIdStr = String(order.employeeId || "").toLowerCase()
-    const employeeNameStr = String(order.employeeName || "").toLowerCase()
-
     const matchesSearch =
-      searchTerm === "" || employeeIdStr.includes(searchLower) || employeeNameStr.includes(searchLower)
+      !searchTerm ||
+      order.employeeId.toLowerCase().includes(searchLower) ||
+      order.employeeName.toLowerCase().includes(searchLower) ||
+      order.menuItemName.toLowerCase().includes(searchLower) ||
+      order.id.toString().includes(searchLower)
 
     const matchesStatus = statusFilter === "all" || order.status === statusFilter.toUpperCase()
     const matchesDepartment = departmentFilter === "all" || order.employeeDepartment === departmentFilter
@@ -139,29 +132,6 @@ export default function AdminOrderHistory() {
 
     return matchesSearch && matchesStatus && matchesDepartment && matchesCategory
   })
-
-  // Calculate employee order counts
-  const employeeOrderCounts = filteredOrders.reduce((acc, order) => {
-    const key = `${order.employeeId}-${order.employeeName}`
-    if (!acc[key]) {
-      acc[key] = {
-        employeeId: order.employeeId,
-        employeeName: order.employeeName,
-        department: order.employeeDepartment,
-        totalOrders: 0,
-        deliveredOrders: 0,
-        cancelledOrders: 0,
-        totalAmount: 0,
-      }
-    }
-    acc[key].totalOrders += 1
-    if (order.status === "DELIVERED") acc[key].deliveredOrders += 1
-    if (order.status === "CANCELLED") acc[key].cancelledOrders += 1
-    acc[key].totalAmount += order.totalPrice || 0
-    return acc
-  }, {})
-
-  const employeeStats = Object.values(employeeOrderCounts).sort((a, b) => b.totalOrders - a.totalOrders)
 
   // Sorting
   const sortedOrders = [...filteredOrders].sort((a, b) => {
@@ -196,48 +166,67 @@ export default function AdminOrderHistory() {
       Quantity: order.quantity,
       "Total Price": order.totalPrice,
       Status: order.status,
-      "Order Time": formatDateTime(order.orderTime),
-      "Completed Time": formatDateTime(order.completedTime),
-      Remarks: (order.remarks || "").replace(/(\r\n|\n|\r)/gm, " ").replace(/"/g, '""'),
+      "Order Time": new Date(order.orderTime).toLocaleString(),
+      "Completed Time": new Date(order.completedTime).toLocaleString(),
+      Remarks: order.remarks || "",
     }))
 
-    const headers = Object.keys(csvData[0]).join(",")
-    const rows = csvData.map((row) =>
-      Object.values(row)
-        .map((val) => `"${val}"`) // Enclose each value in quotes
-        .join(","),
+    const csvContent = [Object.keys(csvData[0]).join(","), ...csvData.map((row) => Object.values(row).join(","))].join(
+      "\n",
     )
 
-    const csvContent = [headers, ...rows].join("\n")
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const blob = new Blob([csvContent], { type: "text/csv" })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    const selectedDept = departmentFilter !== "all" ? departmentFilter : "AllDepts"
-    const selectedMonth = new Date(dateRange.start).toLocaleString("en-IN", { month: "short", year: "numeric" })
-    a.download = `order-history-${selectedDept}-${selectedMonth}.csv`
+    a.download = `order-history-${new Date().toISOString().split("T")[0]}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
   }
 
-  // Calculate comprehensive statistics
+  const formatDateTime = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+  }
+
+  const formatFullDateTime = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getCategoryStyle = (category) => {
+    switch (category) {
+      case "breakfast":
+        return "bg-orange-100 text-orange-800"
+      case "lunch":
+        return "bg-green-100 text-green-800"
+      case "snacks":
+        return "bg-purple-100 text-purple-800"
+      case "beverages":
+        return "bg-blue-100 text-blue-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
   const totalAmount = filteredOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0)
   const statusCounts = filteredOrders.reduce((acc, order) => {
     acc[order.status] = (acc[order.status] || 0) + 1
     return acc
   }, {})
 
-  // Group orders by date for daily statistics
-  const ordersByDate = filteredOrders.reduce((acc, order) => {
-    const date = new Date(order.orderTime).toDateString()
-    if (!acc[date]) {
-      acc[date] = { total: 0, delivered: 0, cancelled: 0 }
-    }
-    acc[date].total += 1
-    if (order.status === "DELIVERED") acc[date].delivered += 1
-    if (order.status === "CANCELLED") acc[date].cancelled += 1
-    return acc
-  }, {})
+  // Check if user is actively searching
+  const isSearching = searchTerm.trim().length > 0
 
   if (isLoading)
     return (
@@ -272,7 +261,7 @@ export default function AdminOrderHistory() {
               <Package className="text-purple-600" size={32} />
               Order History
             </h1>
-            <p className="text-gray-600 mt-1">View completed and cancelled orders with daily statistics</p>
+            <p className="text-gray-600 mt-1">View completed and cancelled orders</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -294,117 +283,47 @@ export default function AdminOrderHistory() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Orders</p>
-                <p className="text-2xl font-bold text-gray-900">{filteredOrders.length}</p>
-              </div>
-              <Package className="text-purple-600" size={24} />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Value</p>
-                <p className="text-2xl font-bold text-green-600">₹{totalAmount.toFixed(2)}</p>
-              </div>
-              <IndianRupee className="text-green-600" size={24} />
-            </div>
-          </div>
-
-          {Object.entries(statusCounts).map(([status, count]) => {
-            const config = statusConfig[status]
-            if (!config) return null
-
-            const Icon = config.icon
-
-            return (
-              <div key={status} className="bg-white p-4 rounded-lg shadow-sm border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">{config.label}</p>
-                    <p className="text-2xl font-bold text-gray-900">{count}</p>
-                  </div>
-                  <Icon className="text-gray-600" size={24} />
+        {/* Stats Cards - Only show when not searching */}
+        {!isSearching && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Orders</p>
+                  <p className="text-2xl font-bold text-gray-900">{filteredOrders.length}</p>
                 </div>
+                <Package className="text-purple-600" size={24} />
               </div>
-            )
-          })}
-        </div>
+            </div>
 
-        {/* Daily Statistics */}
-        <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Order Statistics</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="text-left text-sm font-medium text-gray-700 border-b">
-                  <th className="pb-2">Date</th>
-                  <th className="pb-2 text-center">Total Orders</th>
-                  <th className="pb-2 text-center">Delivered</th>
-                  <th className="pb-2 text-center">Cancelled</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(ordersByDate)
-                  .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-                  .slice(0, 10)
-                  .map(([date, stats]) => (
-                    <tr key={date} className="text-sm border-b border-gray-100">
-                      <td className="py-2 font-medium">{new Date(date).toLocaleDateString("en-IN")}</td>
-                      <td className="py-2 text-center">{stats.total}</td>
-                      <td className="py-2 text-center text-green-600">{stats.delivered}</td>
-                      <td className="py-2 text-center text-red-600">{stats.cancelled}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Value</p>
+                  <p className="text-2xl font-bold text-green-600">₹{totalAmount.toFixed(2)}</p>
+                </div>
+                <IndianRupee className="text-green-600" size={24} />
+              </div>
+            </div>
 
-        {/* Employee Statistics */}
-        {searchTerm && employeeStats.length > 0 && (
-          <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Employee Order Statistics {`searchTerm && (Search: "${searchTerm}")`}
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead>
-                  <tr className="text-left text-sm font-medium text-gray-700 border-b">
-                    <th className="pb-2">Employee ID</th>
-                    <th className="pb-2">Employee Name</th>
-                    <th className="pb-2">Department</th>
-                    <th className="pb-2 text-center">Total Orders</th>
-                    <th className="pb-2 text-center">Delivered</th>
-                    <th className="pb-2 text-center">Cancelled</th>
-                    <th className="pb-2 text-right">Total Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employeeStats.slice(0, 10).map((employee, index) => (
-                    <tr
-                      key={`${employee.employeeId}-${employee.employeeName}`}
-                      className="text-sm border-b border-gray-100"
-                    >
-                      <td className="py-2 font-medium">{employee.employeeId || "N/A"}</td>
-                      <td className="py-2">{employee.employeeName}</td>
-                      <td className="py-2">{employee.department || "N/A"}</td>
-                      <td className="py-2 text-center font-semibold">{employee.totalOrders}</td>
-                      <td className="py-2 text-center text-green-600">{employee.deliveredOrders}</td>
-                      <td className="py-2 text-center text-red-600">{employee.cancelledOrders}</td>
-                      <td className="py-2 text-right font-medium">₹{employee.totalAmount.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {employeeStats.length > 10 && (
-                <p className="text-sm text-gray-500 mt-2">Showing top 10 employees. Total: {employeeStats.length}</p>
-              )}
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Delivered</p>
+                  <p className="text-2xl font-bold text-gray-900">{statusCounts.DELIVERED || 0}</p>
+                </div>
+                <CheckCircle className="text-green-600" size={24} />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Cancelled</p>
+                  <p className="text-2xl font-bold text-gray-900">{statusCounts.CANCELLED || 0}</p>
+                </div>
+                <X className="text-red-600" size={24} />
+              </div>
             </div>
           </div>
         )}
@@ -418,7 +337,7 @@ export default function AdminOrderHistory() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="Search by Employee Name or Employee ID..."
+                placeholder="Search by employee name, employeeId, or order..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -480,25 +399,6 @@ export default function AdminOrderHistory() {
         </div>
       </div>
 
-      {/* Search Results Summary */}
-      {searchTerm && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <div className="flex items-center gap-2">
-            <Search className="text-blue-600" size={16} />
-            <span className="text-sm font-medium text-blue-800">Search Results for "{searchTerm}":</span>
-            <span className="text-sm text-blue-700">
-              {filteredOrders.length} orders found from {employeeStats.length} employee(s)
-            </span>
-          </div>
-          {employeeStats.length > 0 && (
-            <div className="mt-2 text-xs text-blue-600">
-              Top employee: {employeeStats[0]?.employeeName} ({employeeStats[0]?.employeeId}) with{" "}
-              {employeeStats[0]?.totalOrders} orders
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Orders Table */}
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="overflow-x-auto">
@@ -555,10 +455,10 @@ export default function AdminOrderHistory() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
-                    onClick={() => handleSort("completedTime")}
+                    onClick={() => handleSort("deliveredtime")}
                     className="flex items-center gap-1 hover:text-gray-700"
                   >
-                    Completed Time
+                    Delivered Date
                     <ArrowUpDown size={14} />
                   </button>
                 </th>
@@ -686,7 +586,9 @@ export default function AdminOrderHistory() {
             <Package className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No order history found</h3>
             <p className="mt-1 text-sm text-gray-500">
-              Completed orders will appear here once they are delivered or cancelled.
+              {isSearching
+                ? "No orders match your search criteria."
+                : "Completed orders will appear here once they are delivered or cancelled."}
             </p>
           </div>
         )}
@@ -730,7 +632,7 @@ export default function AdminOrderHistory() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Delivered Date</p>
-                    <p>{new Date(selectedOrder.completedTime).toLocaleString()}</p>
+                    <p>{new Date(selectedOrder.DeliveredDate).toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Total Price</p>
@@ -751,9 +653,14 @@ export default function AdminOrderHistory() {
                   <User className="mr-2" size={18} /> Employee Details
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                 <div>
                     <p className="text-sm text-gray-500">Employee ID</p>
                     <p className="font-medium">{selectedOrder.employee?.employeeId || "N/A"}</p>
+
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Name</p>
+                    <p>{selectedOrder.employeeName}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Name</p>
@@ -803,18 +710,83 @@ export default function AdminOrderHistory() {
                   {priceHistory ? "Refresh History" : "Load Price History"}
                   <ChevronDown size={16} className="ml-1" />
                 </button>
+
                 {priceHistory && (
-                  <div className="mt-2 border rounded p-2 max-h-40 overflow-y-auto">
-                    {priceHistory.length > 0 ? (
-                      priceHistory.map((history, idx) => (
-                        <div key={idx} className="text-sm py-1 border-b flex justify-between">
-                          <span>{new Date(history.date).toLocaleDateString()}</span>
-                          <span className="font-medium">₹{history.price.toFixed(2)}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500">No price history available</p>
-                    )}
+                  <div className="mt-2 border rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead>
+                          <tr className="border-b bg-gray-50">
+                            <th className="font-semibold p-3 text-left">Price</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Category</th>
+                            <th className="font-semibold p-3 text-left">Valid From</th>
+                            <th className="font-semibold p-3 text-left">Valid Until</th>
+                            <th className="font-semibold p-3 text-left">Status</th>
+                            <th className="font-semibold p-3 text-left">Created By</th>
+                            <th className="font-semibold p-3 text-left">Created At</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {priceHistory.length > 0 ? (
+                            priceHistory.map((history, index) => (
+                              <tr key={`${history.price}-${history.startDate}`} className="hover:bg-gray-50 border-b">
+                                <td className="p-3">
+                                  <span className="font-semibold text-green-700">₹{history.price?.toFixed(2)}</span>
+                                </td>
+                                <td className="p-3">
+                                  <span
+                                    className={`badge ${getCategoryStyle(history.category)} px-2 py-1 rounded-full text-xs`}
+                                  >
+                                    {history.category}
+                                  </span>
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2 cursor-help">
+                                    <Clock className="w-4 h-4 text-gray-500" />
+                                    {formatDateTime(history.startDate)}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2 cursor-help">
+                                    <Clock className="w-4 h-4 text-gray-500" />
+                                    {history.endDate ? formatDateTime(history.endDate) : "Present"}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                                      history.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                                    }`}
+                                  >
+                                    <div
+                                      className={`w-2 h-2 rounded-full ${history.isActive ? "bg-green-500" : "bg-red-500"}`}
+                                    />
+                                    {history.isActive ? "Active" : "Expired"}
+                                  </span>
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-4 h-4 text-blue-600" />
+                                    <span className="text-blue-700 font-medium">{history.createdBy || "System"}</span>
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="text-sm text-gray-600 cursor-help">
+                                    {formatDateTime(history.createdAt)}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="7" className="p-4 text-center text-gray-500">
+                                No price history available
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
