@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+"use client"
+
+import { useState, useEffect } from "react"
 import {
   Search,
   Filter,
@@ -8,68 +10,63 @@ import {
   XCircle,
   AlertTriangle,
   User,
-  DollarSign,
+  IndianRupee,
   Clock,
   Send,
-  Eye,
-  ToggleLeft,
-  ToggleRight,
   FileText,
   RefreshCw,
   ViewIcon as Preview,
   Mail,
   X,
-  ChevronRight,
-  ChevronLeft,
-} from "lucide-react";
-import { transactionApi } from "../api";
+} from "lucide-react"
+import { transactionApi } from "../api"
 
 export default function AdminTransactionDashboard() {
-  const [transactions, setTransactions] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     search: "",
     employee: "ALL",
     status: "ALL",
     month: "all",
     year: new Date().getFullYear().toString(),
-  });
+  })
   const [billFilters, setBillFilters] = useState({
     employee: "",
     month: "",
     year: new Date().getFullYear().toString(),
-  });
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [responseText, setResponseText] = useState("");
-  const [remarkText, setRemarkText] = useState("");
-  const [billPreview, setBillPreview] = useState(null);
-  const [showBillPreview, setShowBillPreview] = useState(false);
-  const [showResponseDialog, setShowResponseDialog] = useState(false);
-  const [showRemarkDialog, setShowRemarkDialog] = useState(false);
-  const [showStatusDialog, setShowStatusDialog] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
-  const [conversation, setConversation] = useState([]);
+  })
+  const [selectedTransaction, setSelectedTransaction] = useState(null)
+  const [responseText, setResponseText] = useState("")
+  const [remarkText, setRemarkText] = useState("")
+  const [billPreview, setBillPreview] = useState(null)
+  const [showBillPreview, setShowBillPreview] = useState(false)
+  const [showResponseDialog, setShowResponseDialog] = useState(false)
+  const [showRemarkDialog, setShowRemarkDialog] = useState(false)
+  const [showStatusDialog, setShowStatusDialog] = useState(false)
+  const [newStatus, setNewStatus] = useState("")
+  const [conversation, setConversation] = useState([])
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData()
+  }, [])
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      setLoading(true)
       const [transactionsResponse, employeesResponse] = await Promise.all([
         transactionApi.getTransactions(),
         transactionApi.getEmployeesWithTransactions(),
-      ]);
-      setTransactions(transactionsResponse.data);
-      setEmployees(employeesResponse.data);
+      ])
+      setTransactions(transactionsResponse.data)
+      setEmployees(employeesResponse.data)
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("Error loading data:", error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -85,10 +82,10 @@ export default function AdminTransactionDashboard() {
         color: "bg-yellow-100 text-yellow-800 border-yellow-200 animate-pulse",
         icon: AlertTriangle,
       },
-    };
+    }
 
-    const config = statusConfig[status] || statusConfig.ACTIVE;
-    const Icon = config.icon;
+    const config = statusConfig[status] || statusConfig.ACTIVE
+    const Icon = config.icon
 
     return (
       <span
@@ -97,254 +94,249 @@ export default function AdminTransactionDashboard() {
         <Icon className="w-3 h-3" />
         {status}
       </span>
-    );
-  };
+    )
+  }
 
   const formatDateTime = (dateString) => {
-    return new Date(dateString).toLocaleString();
-  };
+    return new Date(dateString).toLocaleString()
+  }
 
   const parseConversation = (remarks, responses) => {
-    const conversation = [];
-    
+    const conversation = []
+
     if (remarks) {
-      remarks.split("\n").forEach(line => {
-        const match = line.match(/^(.*?) - (.*?): (.*)$/);
+      remarks.split("\n").forEach((line) => {
+        const match = line.match(/^(.*?) - (.*?): (.*)$/)
         if (match) {
           conversation.push({
-            type: 'remark',
+            type: "remark",
             timestamp: match[1],
             user: match[2],
             message: match[3],
-          });
+          })
         }
-      });
+      })
     }
-    
+
     if (responses) {
-      responses.split("\n").forEach(line => {
-        const match = line.match(/^(.*?) - (.*?): (.*)$/);
+      responses.split("\n").forEach((line) => {
+        const match = line.match(/^(.*?) - (.*?): (.*)$/)
         if (match) {
           conversation.push({
-            type: 'response',
+            type: "response",
             timestamp: match[1],
             user: match[2],
             message: match[3],
-          });
+          })
         }
-      });
+      })
     }
 
-    return conversation.sort((a, b) => 
-      new Date(a.timestamp) - new Date(b.timestamp)
-    );
-  };
+    return conversation.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+  }
 
-  const handleAddResponse = async () => {
-    if (!responseText.trim()) return;
+ const handleAddResponse = async (fromConversationView = false) => {
+  if (!responseText.trim()) return;
 
-    try {
-      await transactionApi.addResponse(selectedTransaction.id, responseText);
-      setResponseText("");
+  try {
+    await transactionApi.addResponse(selectedTransaction.id, responseText);
+    setResponseText("");
+
+    if (!fromConversationView) {
       setSelectedTransaction(null);
       setShowResponseDialog(false);
-      loadData();
-    } catch (error) {
-      console.error("Error adding response:", error);
+    } else {
+      // Add new response to conversation view
+      setConversation((prev) => [
+        ...prev,
+        {
+          type: "response",
+          timestamp: new Date().toISOString(),
+          user: "Admin", // Replace with actual user if needed
+          message: responseText,
+        },
+      ]);
     }
-  };
 
-  const handleAddRemark = async () => {
-    if (!remarkText.trim()) return;
-
-    try {
-      await transactionApi.addRemark(selectedTransaction.id, remarkText);
-      setRemarkText("");
-      setSelectedTransaction(null);
-      setShowRemarkDialog(false);
-      loadData();
-    } catch (error) {
-      console.error("Error adding remark:", error);
-    }
-  };
-
-  const handleStatusChange = async () => {
-    if (!newStatus) return;
-
-    try {
-      await transactionApi.updateStatus(selectedTransaction.id, newStatus);
-      setNewStatus("");
-      setSelectedTransaction(null);
-      setShowStatusDialog(false);
-      loadData();
-    } catch (error) {
-      console.error("Error updating status:", error);
-    }
-  };
-
-  const showConversation = (transaction) => {
-    setSelectedTransaction(transaction);
-    setConversation(parseConversation(transaction.remarks, transaction.responses));
-  };
-
-  const getNextStatusOptions = (currentStatus) => {
-    switch(currentStatus) {
-      case "ACTIVE":
-        return ["MODIFIED", "INACTIVE"];
-      case "MODIFIED":
-        return ["ACTIVE", "INACTIVE"];
-      case "INACTIVE":
-        return ["ACTIVE", "MODIFIED"];
-      default:
-        return ["ACTIVE", "MODIFIED", "INACTIVE"];
-    }
-  };
-
-
-  const handlePreviewBill = async () => {
-  if (!billFilters.employee || !billFilters.month || !billFilters.year) {
-    alert("Please select employee, month, and year");
-    return;
-  }
-
-  try {
-    const response = await transactionApi.generateBill({
-      employeeId: billFilters.employee,
-      month: billFilters.month,
-      year: billFilters.year,
-    });
-
-    // Get only the selected employee's transactions
-    const employeeTransactions = transactions.filter(
-      t => t.employeeBusinessId === billFilters.employee
-    );
-
-    setBillPreview({
-      ...response.data,
-      activeCount: employeeTransactions.filter(t => t.status === "ACTIVE").length,
-      generatedCount: employeeTransactions.filter(t => t.status === "GENERATED").length,
-      paidCount: employeeTransactions.filter(t => t.status === "PAID").length,
-      inactiveCount: employeeTransactions.filter(t => t.status === "INACTIVE").length,
-      modifiedCount: employeeTransactions.filter(t => t.status === "MODIFIED").length,
-      activeTransactions: response.data.transactions.filter(t => 
-        t.status === "ACTIVE" || t.status === "GENERATED"
-      )
-    });
-    setShowBillPreview(true);
-  } catch (error) {
-    console.error("Error previewing bill:", error);
-  }
-};
-
-const handleSendBill = async () => {
-  if (billPreview.modifiedCount > 0) {
-    alert(`Cannot send bill. ${billPreview.modifiedCount} transaction(s) have MODIFIED status.`);
-    return;
-  }
-
-  const confirmResend = window.confirm(
-    billPreview.generatedCount > 0 
-      ? "Bill has already been generated. Send again?"
-      : "Generate and send bill?"
-  );
-
-  if (!confirmResend) return;
-
-  try {
-    // Update status to GENERATED
-    await Promise.all(
-      billPreview.activeTransactions.map(tx => 
-        transactionApi.updateStatus(tx.id, "GENERATED")
-      )
-    );
-
-    alert("Bill generated successfully!");
-    loadData(); // Refresh data
-  } catch (error) {
-    console.error("Error sending bill:", error);
-  }
-};
-   /*const handlePreviewBill = async () => {
-  if (!billFilters.employee || !billFilters.month || !billFilters.year) {
-    alert("Please select employee, month, and year");
-    return;
-  }
-
-  try {
-    const response = await transactionApi.generateBill({
-      employeeId: billFilters.employee,
-      month: billFilters.month,
-      year: billFilters.year,
-    });
-    
-    // Calculate counts for ONLY the selected employee
-    const employeeTransactions = transactions.filter(
-      t => t.employeeBusinessId === billFilters.employee
-    );
-    
-    setBillPreview({
-      ...response.data,
-      modifiedCount: employeeTransactions.filter(t => t.status === "MODIFIED").length,
-      inactiveCount: employeeTransactions.filter(t => t.status === "INACTIVE").length,
-      activeTransactions: response.data.transactions.filter(t => t.status === "ACTIVE")
-    });
-    setShowBillPreview(true);
-  } catch (error) {
-    console.error("Error previewing bill:", error);
-  }
-};
-const handleSendBill = async () => {
-  if (billPreview.modifiedCount > 0) {
-    alert(`Cannot send bill. ${billPreview.modifiedCount} transaction(s) for this employee have MODIFIED status.`);
-    return;
-  }
-
-  const confirmResend = window.confirm("Bill has already been generated. Do you want to send it again?");
-  if (!confirmResend) return;
-
-  try {
-    const activeTransactions = billPreview.activeTransactions;
-
-    await Promise.all(
-      activeTransactions.map((tx) => transactionApi.updateStatus(tx.id, "PAID"))
-    );
-
-    alert("Bill sent successfully!");
-    // Don't clear the preview or rows
     loadData();
   } catch (error) {
-    console.error("Error sending bill:", error);
+    console.error("Error adding response:", error);
   }
-};*/
+};
 
 
+  const handleAddRemark = async () => {
+    if (!remarkText.trim()) return
+
+    try {
+      await transactionApi.addRemark(selectedTransaction.id, remarkText)
+      setRemarkText("")
+      setSelectedTransaction(null)
+      setShowRemarkDialog(false)
+      loadData()
+    } catch (error) {
+      console.error("Error adding remark:", error)
+    }
+  }
+
+  const handleStatusChange = async () => {
+    if (!newStatus) return
+
+    try {
+      await transactionApi.updateStatus(selectedTransaction.id, newStatus)
+      setNewStatus("")
+      setSelectedTransaction(null)
+      setShowStatusDialog(false)
+      loadData()
+    } catch (error) {
+      console.error("Error updating status:", error)
+    }
+  }
+
+  const showConversation = (transaction) => {
+    setSelectedTransaction(transaction)
+    setConversation(parseConversation(transaction.remarks, transaction.responses))
+  }
+
+  const getNextStatusOptions = (currentStatus) => {
+    switch (currentStatus) {
+      case "ACTIVE":
+        return ["MODIFIED", "INACTIVE"]
+      case "MODIFIED":
+        return ["ACTIVE", "INACTIVE"]
+      case "INACTIVE":
+        return ["ACTIVE", "MODIFIED"]
+      default:
+        return ["ACTIVE", "MODIFIED", "INACTIVE"]
+    }
+  }
+
+  const handlePreviewBill = async () => {
+    if (!billFilters.employee || !billFilters.month || !billFilters.year) {
+      alert("Please select employee, month, and year")
+      return
+    }
+
+    try {
+      const response = await transactionApi.generateBill({
+        employeeId: billFilters.employee,
+        month: billFilters.month,
+        year: billFilters.year,
+      })
+
+      // Filter transactions for ONLY the selected employee and month/year
+      const selectedEmployeeTransactions = transactions.filter((t) => {
+        const transactionDate = new Date(t.createdAt)
+        const transactionMonth = transactionDate.getMonth() + 1
+        const transactionYear = transactionDate.getFullYear()
+
+        return (
+          t.employeeBusinessId === billFilters.employee &&
+          transactionMonth === Number.parseInt(billFilters.month) &&
+          transactionYear === Number.parseInt(billFilters.year)
+        )
+      })
+
+      // Calculate counts based on filtered transactions for the selected employee
+      const activeCount = selectedEmployeeTransactions.filter((t) => t.status === "ACTIVE").length
+      const generatedCount = selectedEmployeeTransactions.filter((t) => t.status === "GENERATED").length
+      const paidCount = selectedEmployeeTransactions.filter((t) => t.status === "PAID").length
+      const inactiveCount = selectedEmployeeTransactions.filter((t) => t.status === "INACTIVE").length
+      const modifiedCount = selectedEmployeeTransactions.filter((t) => t.status === "MODIFIED").length
+
+      // Check if bill is already paid
+      const hasPaidTransactions = paidCount > 0
+
+      setBillPreview({
+        ...response.data,
+        activeCount: activeCount,
+        generatedCount: generatedCount,
+        paidCount: paidCount,
+        inactiveCount: inactiveCount,
+        modifiedCount: modifiedCount,
+        hasPaidTransactions: hasPaidTransactions, // Add this flag
+        activeTransactions: response.data.transactions.filter((t) => t.status === "ACTIVE" || t.status === "GENERATED"),
+      })
+      setShowBillPreview(true)
+    } catch (error) {
+      console.error("Error previewing bill:", error)
+    }
+  }
+
+  const handleSendBill = async () => {
+    if (billPreview.hasPaidTransactions) {
+      alert("Cannot send bill. This bill has already been paid.")
+      return
+    }
+
+    if (billPreview.modifiedCount > 0) {
+      alert(`Cannot send bill. ${billPreview.modifiedCount} transaction(s) have MODIFIED status.`)
+      return
+    }
+
+    const confirmResend = window.confirm(
+      billPreview.generatedCount > 0 ? "Bill has already been generated. Send again?" : "Generate and send bill?",
+    )
+
+    if (!confirmResend) return
+
+    try {
+      // Update status to GENERATED
+      await Promise.all(billPreview.activeTransactions.map((tx) => transactionApi.updateStatus(tx.id, "GENERATED")))
+
+      alert("Bill generated successfully!")
+      loadData() // Refresh data
+    } catch (error) {
+      console.error("Error sending bill:", error)
+    }
+  }
 
   const handleCreateTransactions = async () => {
     try {
-      await transactionApi.createTransactions();
-      loadData();
-      alert("Transactions created successfully from order history");
+      await transactionApi.createTransactions()
+      loadData()
+      alert("Transactions created successfully from order history")
     } catch (error) {
-      console.error("Error creating transactions:", error);
+      console.error("Error creating transactions:", error)
     }
-  };
+  }
 
-  const filteredTransactions = transactions.filter((transaction) => {
+ /* const filteredTransactions = transactions.filter((transaction) => {
     const matchesSearch =
       !filters.search ||
       transaction.transactionId.toLowerCase().includes(filters.search.toLowerCase()) ||
       transaction.employeeName.toLowerCase().includes(filters.search.toLowerCase()) ||
-      transaction.menuItemName.toLowerCase().includes(filters.search.toLowerCase());
+      transaction.menuItemName.toLowerCase().includes(filters.search.toLowerCase())
 
-    const matchesEmployee = filters.employee === "ALL" || transaction.employeeBusinessId === filters.employee;
-    const matchesStatus = filters.status === "ALL" || transaction.status === filters.status;
+    const matchesEmployee = filters.employee === "ALL" || transaction.employeeBusinessId === filters.employee
+    const matchesStatus = filters.status === "ALL" || transaction.status === filters.status
 
-    const transactionDate = new Date(transaction.createdAt);
-    const matchesMonth = filters.month === "all" || transactionDate.getMonth() + 1 === Number.parseInt(filters.month);
-    const matchesYear = !filters.year || transactionDate.getFullYear() === Number.parseInt(filters.year);
+    const transactionDate = new Date(transaction.createdAt)
+    const matchesMonth = filters.month === "all" || transactionDate.getMonth() + 1 === Number.parseInt(filters.month)
+    const matchesYear = !filters.year || transactionDate.getFullYear() === Number.parseInt(filters.year)
 
-    return matchesSearch && matchesEmployee && matchesStatus && matchesMonth && matchesYear;
-  });
+    return matchesSearch && matchesEmployee && matchesStatus && matchesMonth && matchesYear
+  })*/
+const filteredTransactions = transactions.filter((transaction) => {
+  const searchTerm = filters.search.toLowerCase();
+  
+  const matchesSearch =
+    !filters.search ||
+    transaction.transactionId.toLowerCase().includes(searchTerm) ||
+    transaction.employeeName.toLowerCase().includes(searchTerm) ||
+    transaction.employeeBusinessId.toLowerCase().includes(searchTerm) || // Add employee ID search
+    transaction.menuItemName.toLowerCase().includes(searchTerm);
+
+  const matchesEmployee = filters.employee === "ALL" || transaction.employeeBusinessId === filters.employee;
+  const matchesStatus = filters.status === "ALL" || transaction.status === filters.status;
+
+  const transactionDate = new Date(transaction.createdAt);
+  const matchesMonth = filters.month === "all" || transactionDate.getMonth() + 1 === Number.parseInt(filters.month);
+  const matchesYear = !filters.year || transactionDate.getFullYear() === Number.parseInt(filters.year);
+
+  return matchesSearch && matchesEmployee && matchesStatus && matchesMonth && matchesYear;
+});
+
 
   const getStatusCounts = () => {
     return {
@@ -352,10 +344,10 @@ const handleSendBill = async () => {
       active: filteredTransactions.filter((t) => t.status === "ACTIVE").length,
       inactive: filteredTransactions.filter((t) => t.status === "INACTIVE").length,
       modified: filteredTransactions.filter((t) => t.status === "MODIFIED").length,
-    };
-  };
+    }
+  }
 
-  const statusCounts = getStatusCounts();
+  const statusCounts = getStatusCounts()
 
   if (loading) {
     return (
@@ -363,7 +355,7 @@ const handleSendBill = async () => {
         <RefreshCw className="w-8 h-8 animate-spin" />
         <span className="ml-2">Loading transactions...</span>
       </div>
-    );
+    )
   }
 
   return (
@@ -464,12 +456,12 @@ const handleSendBill = async () => {
               >
                 <option value="">Select Year</option>
                 {Array.from({ length: 5 }, (_, i) => {
-                  const year = new Date().getFullYear() - i;
+                  const year = new Date().getFullYear() - i
                   return (
                     <option key={year} value={year}>
                       {year}
                     </option>
-                  );
+                  )
                 })}
               </select>
               <button
@@ -536,12 +528,12 @@ const handleSendBill = async () => {
               className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               {Array.from({ length: 5 }, (_, i) => {
-                const year = new Date().getFullYear() - i;
+                const year = new Date().getFullYear() - i
                 return (
                   <option key={year} value={year}>
                     {year}
                   </option>
-                );
+                )
               })}
             </select>
             <button
@@ -565,9 +557,7 @@ const handleSendBill = async () => {
         {/* Transactions Table */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">
-              Transactions ({filteredTransactions.length})
-            </h3>
+            <h3 className="text-lg font-medium text-gray-900">Transactions ({filteredTransactions.length})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -612,9 +602,7 @@ const handleSendBill = async () => {
                       <div className="flex items-center">
                         <User className="w-4 h-4 text-gray-400 mr-2" />
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {transaction.employeeName}
-                          </div>
+                          <div className="text-sm font-medium text-gray-900">{transaction.employeeName}</div>
                           <div className="text-sm text-gray-500">{transaction.employeeBusinessId}</div>
                         </div>
                       </div>
@@ -631,18 +619,14 @@ const handleSendBill = async () => {
                         {formatDateTime(transaction.createdAt)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {transaction.quantity}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{transaction.quantity}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center text-sm text-gray-900">
-                        <DollarSign className="w-4 h-4 text-gray-400 mr-1" />
+                        <IndianRupee className="w-4 h-4 text-gray-400 mr-1" />
                         {transaction.totalPrice.toFixed(2)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(transaction.status)}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(transaction.status)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => showConversation(transaction)}
@@ -656,8 +640,8 @@ const handleSendBill = async () => {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => {
-                            setSelectedTransaction(transaction);
-                            setShowStatusDialog(true);
+                            setSelectedTransaction(transaction)
+                            setShowStatusDialog(true)
                           }}
                           className="text-gray-600 hover:text-gray-900"
                           title="Change status"
@@ -667,8 +651,8 @@ const handleSendBill = async () => {
                         {transaction.status === "MODIFIED" && (
                           <button
                             onClick={() => {
-                              setSelectedTransaction(transaction);
-                              setShowResponseDialog(true);
+                              setSelectedTransaction(transaction)
+                              setShowResponseDialog(true)
                             }}
                             className="text-green-600 hover:text-green-900"
                             title="Add response"
@@ -679,8 +663,8 @@ const handleSendBill = async () => {
                         {transaction.status !== "MODIFIED" && (
                           <button
                             onClick={() => {
-                              setSelectedTransaction(transaction);
-                              setShowRemarkDialog(true);
+                              setSelectedTransaction(transaction)
+                              setShowRemarkDialog(true)
                             }}
                             className="text-blue-600 hover:text-blue-900"
                             title="Add remark"
@@ -703,16 +687,21 @@ const handleSendBill = async () => {
             <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Add Response</h3>
-                <button onClick={() => {
-                  setShowResponseDialog(false);
-                  setSelectedTransaction(null);
-                }} className="text-gray-400 hover:text-gray-600">
+                <button
+                  onClick={() => {
+                    setShowResponseDialog(false)
+                    setSelectedTransaction(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <div className="space-y-4">
                 <div className="p-2 bg-gray-50 rounded">
-                  <p className="text-sm text-gray-600">Responding to Transaction #{selectedTransaction.transactionId}</p>
+                  <p className="text-sm text-gray-600">
+                    Responding to Transaction #{selectedTransaction.transactionId}
+                  </p>
                 </div>
                 <textarea
                   placeholder="Type your response..."
@@ -724,20 +713,23 @@ const handleSendBill = async () => {
                 <div className="flex justify-end space-x-2">
                   <button
                     onClick={() => {
-                      setShowResponseDialog(false);
-                      setSelectedTransaction(null);
+                      setShowResponseDialog(false)
+                      setSelectedTransaction(null)
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={handleAddResponse}
-                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Response
-                  </button>
+  onClick={() => {
+    handleAddResponse(true); // Mark as fromConversationView
+  }}
+  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+>
+  <Send className="w-4 h-4 mr-2" />
+  Send Response
+</button>
+
                 </div>
               </div>
             </div>
@@ -750,10 +742,13 @@ const handleSendBill = async () => {
             <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Add Remark</h3>
-                <button onClick={() => {
-                  setShowRemarkDialog(false);
-                  setSelectedTransaction(null);
-                }} className="text-gray-400 hover:text-gray-600">
+                <button
+                  onClick={() => {
+                    setShowRemarkDialog(false)
+                    setSelectedTransaction(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -768,8 +763,8 @@ const handleSendBill = async () => {
                 <div className="flex justify-end space-x-2">
                   <button
                     onClick={() => {
-                      setShowRemarkDialog(false);
-                      setSelectedTransaction(null);
+                      setShowRemarkDialog(false)
+                      setSelectedTransaction(null)
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
@@ -803,11 +798,9 @@ const handleSendBill = async () => {
                   <span className="text-sm font-medium">Current Status:</span>
                   <span>{getStatusBadge(selectedTransaction.status)}</span>
                 </div>
-                
+
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Change to:
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Change to:</label>
                   <div className="space-y-2">
                     {getNextStatusOptions(selectedTransaction.status).map((status) => (
                       <div key={status} className="flex items-center">
@@ -850,76 +843,83 @@ const handleSendBill = async () => {
           </div>
         )}
 
-  {selectedTransaction && conversation.length > 0 && (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-        <div className="flex">
-          {/* Conversation Panel (Left) */}
-          <div className="flex-1 pr-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                Conversation for Employee: {selectedTransaction.employeeBusinessId}
-              </h3>
-              <button onClick={() => {
-                setSelectedTransaction(null);
-                setConversation([]);
-              }} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {conversation.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.type === 'remark' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`rounded-lg p-3 max-w-xs ${msg.type === 'remark' ? 'bg-gray-100' : 'bg-blue-100'}`}>
-                    <div className={`text-sm font-medium ${msg.type === 'remark' ? 'text-gray-600' : 'text-blue-600'}`}>
-                      {msg.user}
-                    </div>
-                    <div className="text-sm">{msg.message}</div>
-                    <div className={`text-xs mt-1 ${msg.type === 'remark' ? 'text-gray-400' : 'text-blue-400'}`}>
-                      {formatDateTime(msg.timestamp)}
+        {selectedTransaction && conversation.length > 0 && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+              <div className="flex">
+                {/* Conversation Panel (Left) */}
+                <div className="flex-1 pr-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Conversation for Employee: {selectedTransaction.employeeBusinessId}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setSelectedTransaction(null)
+                        setConversation([])
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {conversation.map((msg, idx) => (
+                      <div key={idx} className={`flex ${msg.type === "remark" ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`rounded-lg p-3 max-w-xs ${msg.type === "remark" ? "bg-gray-100" : "bg-blue-100"}`}
+                        >
+                          <div
+                            className={`text-sm font-medium ${msg.type === "remark" ? "text-gray-600" : "text-blue-600"}`}
+                          >
+                            {msg.user}
+                          </div>
+                          <div className="text-sm">{msg.message}</div>
+                          <div className={`text-xs mt-1 ${msg.type === "remark" ? "text-gray-400" : "text-blue-400"}`}>
+                            {formatDateTime(msg.timestamp)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Response Panel (Right) */}
+                <div className="w-96 border-l pl-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Add Response</h3>
+                  </div>
+                  <div className="space-y-4">
+                    <textarea
+                      placeholder="Type your response..."
+                      value={responseText}
+                      onChange={(e) => setResponseText(e.target.value)}
+                      rows={8}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => setResponseText("")}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleAddResponse(true);
+                          setResponseText("");
+                        }}
+                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Send Response
+                      </button>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-                  {/* Response Panel (Right) */}
-          <div className="w-96 border-l pl-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Add Response</h3>
-            </div>
-            <div className="space-y-4">
-              <textarea
-                placeholder="Type your response..."
-                value={responseText}
-                onChange={(e) => setResponseText(e.target.value)}
-                rows={8}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-              <div className="flex justify-end space-x-2">
-                <button
-                  onClick={() => setResponseText("")}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                >
-                  Clear
-                </button>
-                <button
-                  onClick={() => {
-                    handleAddResponse();
-                    setResponseText("");
-                  }}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  Send Response
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  )}
+        )}
         {/* Bill Preview Dialog */}
         {showBillPreview && billPreview && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -951,13 +951,13 @@ const handleSendBill = async () => {
                 </div>
 
                 {/* Show warning if there are modified transactions */}
-                {statusCounts.modified > 0 && (
+                {billPreview.modifiedCount > 0 && (
                   <div className="border border-yellow-200 bg-yellow-50 p-4 rounded-md">
                     <div className="flex">
                       <AlertTriangle className="h-5 w-5 text-yellow-400" />
                       <div className="ml-3">
                         <p className="text-sm text-yellow-800">
-                          Warning: {statusCounts.modified} transaction(s) have MODIFIED status. Please resolve all
+                          Warning: {billPreview.modifiedCount} transaction(s) have MODIFIED status. Please resolve all
                           remarks before sending the bill.
                         </p>
                       </div>
@@ -965,19 +965,41 @@ const handleSendBill = async () => {
                   </div>
                 )}
 
-                {/* Status summary cards */}
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="bg-green-50 p-3 rounded">
-                    <p className="text-sm text-green-600">Active Transactions</p>
-                    <p className="text-2xl font-bold text-green-700">{billPreview.activeTransactions.length}</p>
+                {/* Show info if bill is already paid */}
+                {billPreview.hasPaidTransactions && (
+                  <div className="border border-green-200 bg-green-50 p-4 rounded-md">
+                    <div className="flex">
+                      <CheckCircle className="h-5 w-5 text-green-400" />
+                      <div className="ml-3">
+                        <p className="text-sm text-green-800">
+                          This bill has already been paid. {billPreview.paidCount} transaction(s) are marked as PAID.
+                        </p>
+                      </div>
+                    </div>
                   </div>
+                )}
+
+                {/* Status summary cards - Now showing counts for selected employee only */}
+                <div className="grid grid-cols-5 gap-4 text-center">
+                  <div className="bg-green-50 p-3 rounded">
+                    <p className="text-sm text-green-600">Active</p>
+                    <p className="text-2xl font-bold text-green-700">{billPreview.activeCount}</p>
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded">
+                    <p className="text-sm text-blue-600">Generated</p>
+                    <p className="text-2xl font-bold text-blue-700">{billPreview.generatedCount}</p>
+                  </div>
+                 { /*<div className="bg-purple-50 p-3 rounded">
+                    <p className="text-sm text-purple-600">Paid</p>
+                    <p className="text-2xl font-bold text-purple-700">{billPreview.paidCount}</p>
+                  </div>*/}
                   <div className="bg-red-50 p-3 rounded">
-                    <p className="text-sm text-red-600">Inactive Transactions</p>
-                    <p className="text-2xl font-bold text-red-700">{statusCounts.inactive}</p>
+                    <p className="text-sm text-red-600">Inactive</p>
+                    <p className="text-2xl font-bold text-red-700">{billPreview.inactiveCount}</p>
                   </div>
                   <div className="bg-yellow-50 p-3 rounded">
-                    <p className="text-sm text-yellow-600">Modified Transactions</p>
-                    <p className="text-2xl font-bold text-yellow-700">{statusCounts.modified}</p>
+                    <p className="text-sm text-yellow-600">Modified</p>
+                    <p className="text-2xl font-bold text-yellow-700">{billPreview.modifiedCount}</p>
                   </div>
                 </div>
 
@@ -1022,15 +1044,22 @@ const handleSendBill = async () => {
                   </button>
                   <button
                     onClick={handleSendBill}
-                    disabled={statusCounts.modified > 0}
+                    disabled={billPreview.modifiedCount > 0 || billPreview.hasPaidTransactions}
                     className={`flex items-center px-4 py-2 rounded-md text-white ${
-                      statusCounts.modified > 0
+                      billPreview.modifiedCount > 0 || billPreview.hasPaidTransactions
                         ? "bg-gray-400 cursor-not-allowed"
                         : "bg-green-600 hover:bg-green-700"
                     }`}
+                    title={
+                      billPreview.hasPaidTransactions
+                        ? "Bill has already been paid"
+                        : billPreview.modifiedCount > 0
+                          ? "Resolve modified transactions first"
+                          : "Generate & Send Bill"
+                    }
                   >
                     <Mail className="w-4 h-4 mr-2" />
-                    Generate & Send Bill
+                    {billPreview.hasPaidTransactions ? "Bill Already Paid" : "Generate & Send Bill"}
                   </button>
                 </div>
               </div>
@@ -1039,5 +1068,5 @@ const handleSendBill = async () => {
         )}
       </div>
     </div>
-  );
+  )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Loader,
   X,
@@ -19,6 +19,15 @@ import api from "./api"
 import { orderApi } from "./api"
 import { useAuth } from "./AuthContext"
 
+// Debounce function
+const debounce = (func, delay) => {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => func.apply(this, args), delay);
+  };
+};
+
 export default function EmployeeOrders() {
   // Authentication and user context
   const { employee, isAdmin } = useAuth()
@@ -33,18 +42,18 @@ export default function EmployeeOrders() {
   const [orderContext, setOrderContext] = useState("self")
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const [showEmployeeIdField, setShowEmployeeIdField] = useState(false)
+  const [employeeIdInput, setEmployeeIdInput] = useState("")
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null)
   const [todayOrdersCount, setTodayOrdersCount] = useState(0)
 
-  // Fetch orders
-  const fetchOrders = async () => {
+  // Fetch orders with useCallback to memoize the function
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -114,12 +123,17 @@ export default function EmployeeOrders() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab, orderContext, selectedEmployeeId, statusFilter, searchQuery, selectedDate, isAdmin, employee])
 
-  // Load data on component mount and when dependencies change
+  // Load data on component mount and when dependencies change with debounce
   useEffect(() => {
-    fetchOrders()
-  }, [activeTab, orderContext, selectedEmployeeId, statusFilter, searchQuery, selectedDate])
+    const debouncedFetch = debounce(fetchOrders, 500)
+    debouncedFetch()
+    
+    return () => {
+      clearTimeout(debouncedFetch)
+    }
+  }, [fetchOrders])
 
   // Cancel an order
   const cancelOrder = async (orderId) => {
@@ -259,10 +273,18 @@ export default function EmployeeOrders() {
                   <div className="mt-3">
                     <input
                       type="text"
-                      value={selectedEmployeeId}
+                      value={employeeIdInput}
                       onChange={(e) => {
-                        setSelectedEmployeeId(e.target.value)
+                        setEmployeeIdInput(e.target.value)
                         if (error) setError(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          setSelectedEmployeeId(employeeIdInput.trim())
+                        }
+                      }}
+                      onBlur={() => {
+                        setSelectedEmployeeId(employeeIdInput.trim())
                       }}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                       placeholder="Enter employee ID"

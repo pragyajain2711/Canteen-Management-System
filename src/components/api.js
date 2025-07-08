@@ -57,8 +57,9 @@ export const transactionApi = {
     checkBillGenerated: (params) =>
   api.get('api/transactions/bill-status', { params }),
   
-    getGeneratedBill: (params) =>
-  api.get('api/transactions/billable', { params }),
+   getGeneratedBill: (data) =>
+  api.post('api/transactions/generate-bill', data),
+
 
 
 };

@@ -24,6 +24,8 @@ import EmployeeOrders from "./components/EmployeeOrders";
 import AdminTransactionManagement from "./components/Admin/AdminTransactionManagement";
 import EmployeeBillPayment from "./components/EmployeeBillPayment";
 import FastOrdering from "./components/Admin/FastOrdering";
+import SuggestionsComplaints from "./components/SuggestionsComplaints";
+import { NotificationProvider } from './components/NotificationContext';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -39,66 +41,73 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <ThemeProvider>
-            <Navbar />
-            <Routes>
-              <Route path="/" element={<CanteenHomePage />} />
-              <Route path="/sign_up" element={<SignUp />} />
-              <Route path="/sign_in" element={<SignIn />} />
-              <Route path="/menu" element={<EmployeeMenu />} />
-              <Route path="/order" element={<EmployeeOrders />} />
-              <Route path="/cart" element={<ViewCart />} />
-              <Route path="/bills" element={
-                <ProtectedRoute>
-                  <EmployeeBillPayment />
-                </ProtectedRoute>
-              } />
-              
-              {/* Regular protected route */}
-              <Route 
-                path="/dashboard" 
-                element={
+        <NotificationProvider>
+          <Router>
+            <ThemeProvider>
+              <Navbar />
+              <Routes>
+                <Route path="/" element={<CanteenHomePage />} />
+                <Route path="/sign_up" element={<SignUp />} />
+                <Route path="/sign_in" element={<SignIn />} />
+                <Route path="/menu" element={<EmployeeMenu />} />
+                <Route path="/order" element={<EmployeeOrders />} />
+                <Route path="/cart" element={<ViewCart />} />
+                <Route path="/bills" element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <EmployeeBillPayment />
                   </ProtectedRoute>
-                } 
-              />
-              
-              {/* Admin dashboard */}
-              <Route 
-                path="/admin-dashboard" 
-                element={
-                  <AdminProtectedRoute>
-                    <AdminDashboard />
-                  </AdminProtectedRoute>
-                } 
-              >
-                <Route index element={<div>Admin Dashboard Home</div>} />
-                <Route path="menu/items" element={<MenuManagement/>} />
-                <Route path="menu/weekly" element={<WeeklyMenuManagement />} />
-                <Route path="customers" element={<CustomerManagement />} />
-                <Route path="orders" element={<AdminOrderManagement />} />
-                <Route path="orders/history" element={<AdminOrderHistory />} />
-                <Route path="transactions" element={<AdminTransactionManagement />} />
-                <Route path="fastordering" element={<FastOrdering />} />
+                } />
+                <Route path="/suggestions" element={
+                  <ProtectedRoute>
+                    <SuggestionsComplaints />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Regular protected route */}
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Admin dashboard */}
+                <Route 
+                  path="/admin-dashboard" 
+                  element={
+                    <AdminProtectedRoute>
+                      <AdminDashboard />
+                    </AdminProtectedRoute>
+                  } 
+                >
+                  <Route index element={<div>Admin Dashboard Home</div>} />
+                  <Route path="menu/items" element={<MenuManagement/>} />
+                  <Route path="menu/weekly" element={<WeeklyMenuManagement />} />
+                  <Route path="customers" element={<CustomerManagement />} />
+                  <Route path="orders" element={<AdminOrderManagement />} />
+                  <Route path="orders/history" element={<AdminOrderHistory />} />
+                  <Route path="transactions" element={<AdminTransactionManagement />} />
+                  <Route path="fastordering" element={<FastOrdering />} />
+                  <Route path="suggestions" element={<SuggestionsComplaints />} />
+                  <Route path="payments" element={<div className="p-6">Payment Management - Coming Soon</div>} />
+                </Route>
 
-                <Route path="payments" element={<div className="p-6">Payment Management - Coming Soon</div>} />
-              </Route>
-
-              {/* Super Admin dashboard */}
-              <Route 
-                path="/superadmin-dashboard" 
-                element={
-                  <AdminProtectedRoute superAdminOnly>
-                    <SuperAdminDashboard />
-                  </AdminProtectedRoute>
-                } 
-              />
-            </Routes>
-            <Footer />
-          </ThemeProvider>
-        </Router>
+                {/* Super Admin dashboard */}
+                <Route 
+                  path="/superadmin-dashboard" 
+                  element={
+                    <AdminProtectedRoute superAdminOnly>
+                      <SuperAdminDashboard />
+                    </AdminProtectedRoute>
+                  } 
+                />
+              </Routes>
+              <Footer />
+            </ThemeProvider>
+          </Router>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

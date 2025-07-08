@@ -3,13 +3,16 @@
 import { useContext, useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { AuthContext } from "./AuthContext"
-import { Clock, Calendar, ChefHat, Menu, X, Settings, Bell, History, CreditCard } from "lucide-react"
+import { useNotifications } from "./NotificationContext"
+import { Clock, Calendar, ChefHat, Menu, X, Settings, Bell, CreditCard, MessageSquare } from "lucide-react"
+import NotificationDialog from "./NotificationDialog"
 
 function Navbar() {
-  const { isAuthenticated, employee, logout } = useContext(AuthContext)
+  const { isAuthenticated, employee, logout, isAdmin } = useContext(AuthContext)
+  const { notifications } = useNotifications()
   const [hamburgerMenuOpen, setHamburgerMenuOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [notifications, setNotifications] = useState([]) // Empty by default
+  const [showNotificationDialog, setShowNotificationDialog] = useState(false)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -27,9 +30,7 @@ function Navbar() {
     <>
       <header className="bg-white shadow-sm border-b border-slate-200">
         <div className="flex justify-between items-center h-16">
-          {/* Left Section: Hamburger + Logo */}
           <div className="flex items-center space-x-4">
-            {/* Hamburger */}
             <button
               className="p-2 rounded-lg hover:bg-slate-100 transition-colors relative"
               onClick={() => setHamburgerMenuOpen(!hamburgerMenuOpen)}
@@ -37,7 +38,6 @@ function Navbar() {
               {hamburgerMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
 
-            {/* Logo + Title */}
             <div className="flex items-center space-x-3">
               <div className="bg-blue-100 p-2 rounded-lg">
                 <ChefHat className="w-8 h-8 text-blue-600" />
@@ -49,7 +49,6 @@ function Navbar() {
             </div>
           </div>
 
-          {/* Center Section: Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <Link to="/" className="text-slate-700 hover:text-blue-600 font-medium transition-colors">
               Home
@@ -64,7 +63,6 @@ function Navbar() {
             )}
           </nav>
 
-          {/* Right Section: Time + Auth Buttons */}
           <div className="hidden md:flex items-center space-x-6">
             <div className="flex items-center space-x-4 text-sm text-slate-600">
               <div className="flex items-center space-x-1">
@@ -79,6 +77,17 @@ function Navbar() {
             <div className="flex items-center space-x-3">
               {isAuthenticated ? (
                 <>
+                  <button
+                    onClick={() => setShowNotificationDialog(true)}
+                    className="p-2 rounded-lg hover:bg-slate-100 transition-colors relative"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {notifications.length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                        {notifications.length}
+                      </span>
+                    )}
+                  </button>
                   <span className="text-slate-700">Hi, {employee?.fullName}</span>
                   <button
                     onClick={logout}
@@ -108,16 +117,12 @@ function Navbar() {
         </div>
       </header>
 
-      {/* Hamburger Menu Overlay */}
       {hamburgerMenuOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setHamburgerMenuOpen(false)} />
 
-          {/* Sidebar */}
           <div className="absolute left-0 top-0 h-full w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out">
             <div className="flex flex-col h-full">
-              {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
                 <div className="flex items-center space-x-3">
                   <div className="bg-blue-100 p-2 rounded-lg">
@@ -136,20 +141,13 @@ function Navbar() {
                 </button>
               </div>
 
-              {/* Menu Items */}
               <div className="flex-1 overflow-y-auto p-6">
                 <div className="space-y-4">
-                  {/* Notifications */}
                   <div
                     className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 hover:bg-yellow-100 transition-colors cursor-pointer"
                     onClick={() => {
                       setHamburgerMenuOpen(false)
-                      // Handle notifications click
-                      if (notifications.length === 0) {
-                        alert("No new notifications")
-                      } else {
-                        alert(`You have ${notifications.length} notifications`)
-                      }
+                      setShowNotificationDialog(true)
                     }}
                   >
                     <div className="flex items-center space-x-3">
@@ -159,9 +157,9 @@ function Navbar() {
                       <div>
                         <h3 className="font-semibold text-gray-800">Notifications</h3>
                         <p className="text-sm text-gray-600">
-                          {`notifications.length === 0
+                          {notifications.length === 0
                             ? "No new notifications"
-                            : ${notifications.length} new notifications`}
+                            : `${notifications.length} new notifications`}
                         </p>
                       </div>
                       {notifications.length > 0 && (
@@ -174,71 +172,48 @@ function Navbar() {
                     </div>
                   </div>
 
-                  {/* Order History */}
-                  <div
-                    className="bg-blue-50 rounded-lg p-4 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setHamburgerMenuOpen(false)
-                      // This will be connected to your order history functionality
-                      console.log("Navigate to order history")
-                    }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-blue-100 p-2 rounded-lg">
-                        <History className="w-5 h-5 text-blue-600" />
+                  {isAuthenticated && (
+                    <Link to="/suggestions" className="block">
+                      <div
+                        className="bg-purple-50 rounded-lg p-4 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
+                        onClick={() => setHamburgerMenuOpen(false)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-purple-100 p-2 rounded-lg">
+                            <MessageSquare className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-800">Suggestions & Complaints</h3>
+                            <p className="text-sm text-gray-600">Share your feedback</p>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-800">Order History</h3>
-                        <p className="text-sm text-gray-600">View past orders</p>
-                      </div>
-                    </div>
-                  </div>
+                    </Link>
+                  )}
 
-                  {/* Transaction History */}
-                 {/*} <div
-                    className="bg-green-50 rounded-lg p-4 border border-green-200 hover:bg-green-100 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setHamburgerMenuOpen(false)
-                      // This will be connected to your transaction system
-                      console.log("Navigate to transaction history")
-                    }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-green-100 p-2 rounded-lg">
-                        <CreditCard className="w-5 h-5 text-green-600" />
+                  {isAuthenticated && (
+                    <Link to="/bills" className="block">
+                      <div
+                        className="bg-green-50 rounded-lg p-4 border border-green-200 hover:bg-green-100 transition-colors cursor-pointer"
+                        onClick={() => setHamburgerMenuOpen(false)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-green-100 p-2 rounded-lg">
+                            <CreditCard className="w-5 h-5 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-800">My Bills & Payments</h3>
+                            <p className="text-sm text-gray-600">View and pay your canteen bills</p>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-800">Transaction History</h3>
-                        <p className="text-sm text-gray-600">View payment records</p>
-                      </div>
-                    </div>
-                  </div>*/}
+                    </Link>
+                  )}
 
-{isAuthenticated && (
-  <Link to="/bills" className="block">
-    <div
-      className="bg-green-50 rounded-lg p-4 border border-green-200 hover:bg-green-100 transition-colors cursor-pointer"
-      onClick={() => setHamburgerMenuOpen(false)}
-    >
-      <div className="flex items-center space-x-3">
-        <div className="bg-green-100 p-2 rounded-lg">
-          <CreditCard className="w-5 h-5 text-green-600" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-gray-800">My Bills & Payments</h3>
-          <p className="text-sm text-gray-600">View and pay your canteen bills</p>
-        </div>
-      </div>
-    </div>
-  </Link>
-)}
-
-                  {/* Settings */}
                   <div
                     className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
                     onClick={() => {
                       setHamburgerMenuOpen(false)
-                      // This will be connected to your settings system
                       console.log("Navigate to settings")
                     }}
                   >
@@ -255,7 +230,6 @@ function Navbar() {
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="p-6 border-t border-gray-200 bg-gray-50">
                 <div className="text-center">
                   <p className="text-sm text-gray-500">Office Canteen v2.0</p>
@@ -266,6 +240,11 @@ function Navbar() {
           </div>
         </div>
       )}
+
+      <NotificationDialog 
+        open={showNotificationDialog} 
+        onClose={() => setShowNotificationDialog(false)}
+      />
     </>
   )
 }

@@ -33,6 +33,11 @@ function SignIn() {
         employeeId: response.data.employeeId,
         department: response.data.department
       };
+
+      // 🔽 Store in localStorage so other pages can access
+localStorage.setItem("employeeId", response.data.employeeId);
+localStorage.setItem("employeeName", response.data.fullName);
+
              login(response.data.token, employeeData,response.data.admin,response.data.superAdmin);
       console.log("Login response:", response.data);
 

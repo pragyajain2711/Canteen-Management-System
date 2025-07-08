@@ -452,8 +452,9 @@ const FastOrdering = () => {
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Employee Search Section */}
-          <div className="lg:col-span-4">
-            <div className="bg-white rounded-lg shadow-md p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 hover:scale-[1.02]">
+          <div className="lg:col-span-3">
+            <div className="h-[400px] overflow-y-auto bg-white rounded-lg shadow-md p-6">
+
               <div className="flex items-center gap-2 mb-4">
                 <Users className="h-5 w-5 text-blue-600" />
                 <h2 className="text-lg font-semibold">Customer Selection</h2>
@@ -538,7 +539,7 @@ const FastOrdering = () => {
 
           {/* Menu Section */}
           <div className="lg:col-span-5">
-            <div className="bg-white rounded-lg shadow-md p-6 h-[calc(100vh-200px)] transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01]">
+            <div className="h-[calc(100vh-160px)] overflow-y-auto bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Filter className="h-5 w-5 text-blue-600" />
@@ -757,11 +758,12 @@ const FastOrdering = () => {
           </div>
 
           {/* Order Summary Section */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-4 h-[calc(100vh-200px)] transition-all duration-300 hover:shadow-xl hover:-translate-y-2 hover:scale-[1.02]">
-              <div className="flex items-center gap-2 mb-4">
+          <div className="lg:col-span-4">
+           <div className="bg-white rounded-lg shadow-md h-[calc(100vh-160px)] flex flex-col">
+    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex items-center gap-2 mb-4">
                 <ShoppingCart className="h-5 w-5 text-blue-600" />
-                <h2 className="text-lg font-semibold">Order Summary</h2>
+                <h2 className="text-lg font-semibold">Order</h2> </div>
                 {orderItems.length > 0 && (
                   <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                     {orderItems.length}
@@ -770,35 +772,33 @@ const FastOrdering = () => {
               </div>
 
               {/* Employee Details in Order Summary */}
-              {selectedEmployee ? (
-                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-blue-800">Customer Details</h3>
-                    <button
-                      onClick={() => setSelectedEmployee(null)}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      Change
-                    </button>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="font-medium">
-                      {selectedEmployee.firstName} {selectedEmployee.lastName}
-                    </div>
-                    <div className="text-sm text-gray-600">{selectedEmployee.employeeId}</div>
-                    <div className="text-sm text-gray-600">{selectedEmployee.department}</div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      selectedEmployee.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                    }`}>
-                      {selectedEmployee.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 text-center text-gray-500">
-                  No customer selected
-                </div>
-              )}
+             {selectedEmployee ? (
+  <div className="bg-blue-50 rounded-lg border border-blue-100 p-5 text-base leading-relaxed space-y-3 shadow-sm">
+    <div className="flex items-center justify-between mb-2">
+      <h3 className="text-lg font-semibold text-blue-800">Selected Customer</h3>
+      <button
+        onClick={() => setSelectedEmployee(null)}
+        className="text-blue-600 hover:text-blue-800 text-sm"
+      >
+        Change
+      </button>
+    </div>
+    <div className="space-y-2">
+      <div className="text-lg font-semibold">
+        {selectedEmployee.firstName} {selectedEmployee.lastName}
+      </div>
+      <div className="text-sm text-gray-700">Employee ID: {selectedEmployee.employeeId}</div>
+      <div className="text-sm text-gray-700">Department: {selectedEmployee.department}</div>
+      <span className={`text-sm font-medium px-3 py-1 rounded-full ${
+        selectedEmployee.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+      }`}>
+        {selectedEmployee.isActive ? "Active" : "Inactive"}
+      </span>
+    </div>
+  </div>
+) : (
+  <div className="text-sm text-gray-500">  No customer selected    </div>
+)}
 
               {/* Remarks */}
               <textarea
@@ -814,7 +814,7 @@ const FastOrdering = () => {
               {/* Order Items */}
               {orderItems.length > 0 ? (
                 <>
-                  <div className="h-[calc(100%-300px)] overflow-y-auto">
+                  <div className="+h-[calc(100%-300px)] overflow-y-auto">
                     <div className="space-y-3 pr-2">
                       {orderItems.map((item, index) => (
                         <div
