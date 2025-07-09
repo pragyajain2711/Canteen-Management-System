@@ -75,7 +75,7 @@ export default function ModernCanteenHomepage() {
         return
       }
 
-      console.log("Loading cart for e`mployee:", employeeId)
+      console.log("Loading cart for employee:", employeeId)
       const response = await api.get(`/api/orders/pending/${employeeId}`)
       console.log("Cart response:", response.data)
 
@@ -134,7 +134,8 @@ export default function ModernCanteenHomepage() {
             menuId: item.menuId,
             name: item.name,
             price: item.price,
-            available: item.isActive,
+            // FIXED: Use availableStatus instead of isActive for availability
+            available: item.availableStatus && isItemActive(item.startDate, item.endDate),
             category: item.category,
             description: item.description,
             quantity: item.quantity,
@@ -161,6 +162,17 @@ export default function ModernCanteenHomepage() {
 
     fetchTodayMenu()
   }, [])
+
+  // Helper function to check if item is active based on date range
+  const isItemActive = (startDate, endDate) => {
+    const now = new Date()
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+    const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+    return today >= startDay && today <= endDay
+  }
 
   const getCurrentDay = () => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]

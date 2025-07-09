@@ -19,6 +19,7 @@ import {
 import { Link } from "react-router-dom"
 import { orderApi } from "../api"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "react-hot-toast"
 
 const statusConfig = {
   PENDING: {
@@ -69,54 +70,77 @@ export default function AdminOrderManagement() {
   const [selectedOrders, setSelectedOrders] = useState([])
   const [sortConfig, setSortConfig] = useState({ key: "orderTime", direction: "desc" })
   const [expandedOrders, setExpandedOrders] = useState({})
-  const [activeOrderFilter, setActiveOrderFilter] = useState("all") // New state for active orders filter
+  const [activeOrderFilter, setActiveOrderFilter] = useState("all")
+  const [lastRefreshed, setLastRefreshed] = useState(null)
 
   const queryClient = useQueryClient()
 
-  // Fetch active orders - keeping your existing API call
-  const {
-    data: orders,
-    isLoading,
-    error,
+  const { 
+    data: orders, 
+    isLoading, 
+    error, 
+    refetch: refetchOrders 
   } = useQuery({
     queryKey: ["activeOrders"],
     queryFn: async () => {
-      const response = await orderApi.getAllOrders()
-      console.log("API Response:", response)
-      return response.data
+      try {
+        const response = await orderApi.getAllOrders()
+        setLastRefreshed(new Date())
+        return response.data
+      } catch (error) {
+        throw error
+      }
     },
     refetchInterval: 30000,
   })
 
-  // Filter only active statuses in frontend
   const activeStatuses = ["PENDING", "PREPARING", "READY"]
 
-  // Fetch detailed order data - keeping your existing API call
   const { data: orderDetails } = useQuery({
     queryKey: ["orderDetails", selectedOrder?.id],
     queryFn: () => (selectedOrder ? orderApi.getOrderDetails(selectedOrder.id) : null),
     enabled: !!selectedOrder,
   })
 
-  // Status update mutation - keeping your existing API call
   const statusMutation = useMutation({
     mutationFn: ({ orderId, status }) => orderApi.updateStatus(orderId, status),
-    onSuccess: () => queryClient.invalidateQueries(["activeOrders"]),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["activeOrders"])
+      toast.success("Order status updated successfully")
+    },
+    onError: (error) => {
+      toast.error(`Failed to update status: ${error.message}`)
+    }
   })
 
-  // Cancel order mutation - keeping your existing API call
   const cancelMutation = useMutation({
     mutationFn: (orderId) => orderApi.cancelOrder(orderId),
-    onSuccess: () => queryClient.invalidateQueries(["activeOrders"]),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["activeOrders"])
+      toast.success("Order cancelled successfully")
+    },
+    onError: (error) => {
+      toast.error(`Failed to cancel order: ${error.message}`)
+    }
   })
 
-  // Fetch price history - keeping your existing API call
   const fetchPriceHistory = async (orderId) => {
     try {
       const { data } = await orderApi.getOrderPriceHistory(orderId)
       setPriceHistory(data)
+      toast.success("Price history loaded")
     } catch (err) {
       console.error("Failed to fetch price history:", err)
+      toast.error("Failed to load price history")
+    }
+  }
+
+  const handleRefresh = async () => {
+    try {
+      await refetchOrders()
+      toast.success(`Orders refreshed at ${new Date().toLocaleTimeString()}`)
+    } catch (error) {
+      toast.error("Failed to refresh orders")
     }
   }
 
@@ -133,11 +157,8 @@ export default function AdminOrderManagement() {
       currentPrice: order.menuItem?.currentPrice || order.priceAtOrder,
     })) || []
 
-  // Enhanced filtering - FIXED SEARCH LOGIC
   const filteredOrders = normalizedOrders.filter((order) => {
     const isActiveStatus = activeStatuses.includes(order.status)
-
-    // FIXED: Improved search logic to handle all the fields properly
     const searchLower = searchTerm.toLowerCase()
     const matchesSearch =
       searchTerm === "" ||
@@ -153,10 +174,7 @@ export default function AdminOrderManagement() {
     return isActiveStatus && matchesSearch && matchesStatus && matchesDepartment
   })
 
-  // Get all orders for comprehensive stats (including completed ones)
   const allOrdersForStats = normalizedOrders || []
-
-  // Get today's orders only
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const todaysOrders = allOrdersForStats.filter((order) => {
@@ -165,16 +183,13 @@ export default function AdminOrderManagement() {
     return orderDate.getTime() === today.getTime()
   })
 
-  // FIXED: Active orders filtered by status for the Active Orders card
   const activeOrdersByStatus = filteredOrders.filter((order) => {
     if (activeOrderFilter === "all") return true
     return order.status === activeOrderFilter.toUpperCase()
   })
 
-  // FIXED: Use the correct filtered orders for display
   const ordersToDisplay = activeOrdersByStatus
 
-  // Sorting - FIXED: Apply sorting to the correct filtered orders
   const sortedOrders = [...ordersToDisplay].sort((a, b) => {
     let aValue = a[sortConfig.key]
     let bValue = b[sortConfig.key]
@@ -211,14 +226,10 @@ export default function AdminOrderManagement() {
     setSelectedOrders([])
   }
 
-  // New orders notification
   const newOrders = orders?.filter((o) => o.status === "PENDING").slice(0, 3) || []
-
-  // Comprehensive stats calculations
   const deliveredOrders = allOrdersForStats.filter((order) => order.status === "DELIVERED").length
   const cancelledOrders = allOrdersForStats.filter((order) => order.status === "CANCELLED").length
 
-  // Active orders status counts - FIXED: Use correct base for counting
   const activeOrdersCounts = {
     all: filteredOrders.length,
     pending: filteredOrders.filter((order) => order.status === "PENDING").length,
@@ -251,7 +262,6 @@ export default function AdminOrderManagement() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -266,15 +276,20 @@ export default function AdminOrderManagement() {
               )}
             </h1>
             <p className="text-gray-600 mt-1">Manage pending, preparing, and ready orders</p>
+            {lastRefreshed && (
+              <p className="text-xs text-gray-500 mt-1">
+                Last refreshed: {lastRefreshed.toLocaleTimeString()}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => queryClient.invalidateQueries(["activeOrders"])}
+              onClick={handleRefresh}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <RefreshCw size={16} />
-              Refresh
+              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              {isLoading ? "Refreshing..." : "Refresh"}
             </button>
             <Link
               to="/admin-dashboard/orders/history"
@@ -285,7 +300,6 @@ export default function AdminOrderManagement() {
           </div>
         </div>
 
-        {/* Comprehensive Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           <div className="bg-white p-4 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between mb-2">
@@ -341,7 +355,6 @@ export default function AdminOrderManagement() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border mb-6">
         <div className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -386,7 +399,6 @@ export default function AdminOrderManagement() {
         </div>
       </div>
 
-      {/* Orders Cards */}
       <div className="space-y-4">
         {sortedOrders.map((order) => {
           const statusConfig_ = statusConfig[order.status]
@@ -446,7 +458,6 @@ export default function AdminOrderManagement() {
                 </div>
               </div>
 
-              {/* Expandable Items Section */}
               <div className="mt-4 border-t pt-4">
                 <button
                   onClick={() => setExpandedOrders((prev) => ({ ...prev, [order.id]: !prev[order.id] }))}
@@ -459,7 +470,6 @@ export default function AdminOrderManagement() {
                   {isExpanded ? "Hide Items" : "View Items"}
                 </button>
 
-                {/* Delivery Date - Outside expandable section */}
                 <div className="mt-3 text-sm">
                   <span className="text-gray-500">Expected Delivery:</span>
                   <span className="ml-2 font-medium">
@@ -499,7 +509,6 @@ export default function AdminOrderManagement() {
                       </table>
                     </div>
 
-                    {/* Remarks - Inside expandable section */}
                     {order.remarks && (
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <p className="text-sm text-gray-500 mb-1">Remarks:</p>
@@ -509,7 +518,6 @@ export default function AdminOrderManagement() {
                       </div>
                     )}
 
-                    {/* Additional Order Details */}
                     <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-500">Department:</span>
@@ -532,7 +540,6 @@ export default function AdminOrderManagement() {
         )}
       </div>
 
-      {/* Order Details Modal - keeping your existing modal structure */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -550,7 +557,6 @@ export default function AdminOrderManagement() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Order Information */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <ClipboardList className="mr-2" size={18} /> Order Information
@@ -583,7 +589,6 @@ export default function AdminOrderManagement() {
                 </div>
               </div>
 
-              {/* Employee Details */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <User className="mr-2" size={18} /> Employee Details
@@ -608,7 +613,6 @@ export default function AdminOrderManagement() {
                 </div>
               </div>
 
-              {/* Item Details */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <Utensils className="mr-2" size={18} /> Item Details
@@ -633,7 +637,6 @@ export default function AdminOrderManagement() {
                 </div>
               </div>
 
-              {/* Price History */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <IndianRupee className="mr-2" size={18} /> Price History

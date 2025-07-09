@@ -4,7 +4,7 @@ import { useContext, useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { AuthContext } from "./AuthContext"
 import { useNotifications } from "./NotificationContext"
-import { Clock, Calendar, ChefHat, Menu, X, Settings, Bell, CreditCard, MessageSquare } from "lucide-react"
+import { Clock, Calendar, Menu, X, Settings, Bell, CreditCard, MessageSquare } from "lucide-react"
 import NotificationDialog from "./NotificationDialog"
 
 function Navbar() {
@@ -39,13 +39,16 @@ function Navbar() {
             </button>
 
             <div className="flex items-center space-x-3">
-              <div className="bg-blue-100 p-2 rounded-lg">
-                <ChefHat className="w-8 h-8 text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-800">Office Canteen</h1>
-                <p className="text-sm text-slate-500">Fresh & Delicious</p>
-              </div>
+              <a href="/" className="flex items-center gap-3">
+                <img
+                  src="/assets/images/logo.png"
+                  alt="IOCL"
+                  className="h-12 w-auto"
+                />
+                <span className="text-2xl font-bold text-orange-700 tracking-wide">
+                  IOCL <span className="text-blue-900">CANTEEN</span>
+                </span>
+              </a>
             </div>
           </div>
 
@@ -117,20 +120,25 @@ function Navbar() {
         </div>
       </header>
 
+      {/* Hamburger drawer */}
       {hamburgerMenuOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setHamburgerMenuOpen(false)} />
 
           <div className="absolute left-0 top-0 h-full w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out">
             <div className="flex flex-col h-full">
+              {/* Top header with IOCL logo */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-blue-100 p-2 rounded-lg">
-                    <ChefHat className="w-6 h-6 text-blue-600" />
-                  </div>
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/assets/images/logo.png"
+                    alt="IOCL Logo"
+                    className="h-12 w-auto"
+                  />
                   <div>
-                    <h2 className="text-lg font-bold text-slate-800">Menu</h2>
-                    <p className="text-sm text-slate-500">Quick Access</p>
+                    <h2 className="text-xl font-bold text-orange-700 leading-tight">
+                      IOCL <span className="text-blue-900">CANTEEN</span>
+                    </h2>
                   </div>
                 </div>
                 <button
@@ -141,99 +149,99 @@ function Navbar() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="space-y-4">
-                  <div
-                    className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 hover:bg-yellow-100 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setHamburgerMenuOpen(false)
-                      setShowNotificationDialog(true)
-                    }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-yellow-100 p-2 rounded-lg">
-                        <Bell className="w-5 h-5 text-yellow-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-800">Notifications</h3>
-                        <p className="text-sm text-gray-600">
-                          {notifications.length === 0
-                            ? "No new notifications"
-                            : `${notifications.length} new notifications`}
-                        </p>
-                      </div>
-                      {notifications.length > 0 && (
-                        <div className="ml-auto">
-                          <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                            {notifications.length}
-                          </span>
-                        </div>
-                      )}
+              {/* Drawer Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div
+                  className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 hover:bg-yellow-100 transition-colors cursor-pointer"
+                  onClick={() => {
+                    setHamburgerMenuOpen(false)
+                    setShowNotificationDialog(true)
+                  }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-yellow-100 p-2 rounded-lg">
+                      <Bell className="w-5 h-5 text-yellow-600" />
                     </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-800">Notifications</h3>
+                      <p className="text-sm text-gray-600">
+                        {notifications.length === 0
+                          ? "No new notifications"
+                          : `${notifications.length} new notifications`}
+                      </p>
+                    </div>
+                    {notifications.length > 0 && (
+                      <div className="ml-auto">
+                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                          {notifications.length}
+                        </span>
+                      </div>
+                    )}
                   </div>
+                </div>
 
-                  {isAuthenticated && (
-                    <Link to="/suggestions" className="block">
-                      <div
-                        className="bg-purple-50 rounded-lg p-4 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
-                        onClick={() => setHamburgerMenuOpen(false)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="bg-purple-100 p-2 rounded-lg">
-                            <MessageSquare className="w-5 h-5 text-purple-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-gray-800">Suggestions & Complaints</h3>
-                            <p className="text-sm text-gray-600">Share your feedback</p>
-                          </div>
+                {isAuthenticated && (
+                  <Link to="/suggestions" className="block">
+                    <div
+                      className="bg-purple-50 rounded-lg p-4 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
+                      onClick={() => setHamburgerMenuOpen(false)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="bg-purple-100 p-2 rounded-lg">
+                          <MessageSquare className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-800">Suggestions & Complaints</h3>
+                          <p className="text-sm text-gray-600">Share your feedback</p>
                         </div>
                       </div>
-                    </Link>
-                  )}
+                    </div>
+                  </Link>
+                )}
 
-                  {isAuthenticated && (
-                    <Link to="/bills" className="block">
-                      <div
-                        className="bg-green-50 rounded-lg p-4 border border-green-200 hover:bg-green-100 transition-colors cursor-pointer"
-                        onClick={() => setHamburgerMenuOpen(false)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="bg-green-100 p-2 rounded-lg">
-                            <CreditCard className="w-5 h-5 text-green-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-gray-800">My Bills & Payments</h3>
-                            <p className="text-sm text-gray-600">View and pay your canteen bills</p>
-                          </div>
+                {isAuthenticated && (
+                  <Link to="/bills" className="block">
+                    <div
+                      className="bg-green-50 rounded-lg p-4 border border-green-200 hover:bg-green-100 transition-colors cursor-pointer"
+                      onClick={() => setHamburgerMenuOpen(false)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="bg-green-100 p-2 rounded-lg">
+                          <CreditCard className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-800">My Bills & Payments</h3>
+                          <p className="text-sm text-gray-600">View and pay your canteen bills</p>
                         </div>
                       </div>
-                    </Link>
-                  )}
+                    </div>
+                  </Link>
+                )}
 
-                  <div
-                    className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setHamburgerMenuOpen(false)
-                      console.log("Navigate to settings")
-                    }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-gray-100 p-2 rounded-lg">
-                        <Settings className="w-5 h-5 text-gray-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-800">Settings</h3>
-                        <p className="text-sm text-gray-600">Manage preferences</p>
-                      </div>
+                <div
+                  className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                  onClick={() => {
+                    setHamburgerMenuOpen(false)
+                    console.log("Navigate to settings")
+                  }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-gray-100 p-2 rounded-lg">
+                      <Settings className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-800">Settings</h3>
+                      <p className="text-sm text-gray-600">Manage preferences</p>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Drawer Footer */}
               <div className="p-6 border-t border-gray-200 bg-gray-50">
                 <div className="text-center">
-                  <p className="text-sm text-gray-500">Office Canteen v2.0</p>
-                  <p className="text-xs text-gray-400 mt-1">Fresh & Delicious</p>
+                  <p className="text-sm font-bold text-orange-700">IOCL CANTEEN</p>
+                  <p className="text-xs text-blue-900 mt-1">Powered by Indian Oil</p>
                 </div>
               </div>
             </div>
@@ -241,8 +249,8 @@ function Navbar() {
         </div>
       )}
 
-      <NotificationDialog 
-        open={showNotificationDialog} 
+      <NotificationDialog
+        open={showNotificationDialog}
         onClose={() => setShowNotificationDialog(false)}
       />
     </>

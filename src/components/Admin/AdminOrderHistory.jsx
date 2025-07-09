@@ -1,4 +1,3 @@
-"use client"
 
 import { useState } from "react"
 import {
@@ -22,6 +21,7 @@ import {
 } from "lucide-react"
 import { orderApi } from "../api"
 import { useQuery } from "@tanstack/react-query"
+import { toast } from "react-hot-toast"
 
 const statusConfig = {
   DELIVERED: {
@@ -57,8 +57,8 @@ export default function AdminOrderHistory() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [priceHistory, setPriceHistory] = useState(null)
   const [sortConfig, setSortConfig] = useState({ key: "orderTime", direction: "desc" })
+  const [lastRefreshed, setLastRefreshed] = useState(null)
 
-  // Fetch historical orders - keeping your existing API call
   const {
     data: rawOrders,
     isLoading,
@@ -67,39 +67,51 @@ export default function AdminOrderHistory() {
   } = useQuery({
     queryKey: ["historicalOrders", dateRange, departmentFilter, categoryFilter],
     queryFn: async () => {
-      const response = await orderApi.getOrderHistory(
-        dateRange.start,
-        dateRange.end,
-        departmentFilter === "all" ? undefined : departmentFilter,
-        categoryFilter === "all" ? undefined : categoryFilter,
-      )
-      console.log("Order history response:", response)
-      return response.data
+      try {
+        const response = await orderApi.getOrderHistory(
+          dateRange.start,
+          dateRange.end,
+          departmentFilter === "all" ? undefined : departmentFilter,
+          categoryFilter === "all" ? undefined : categoryFilter,
+        )
+        setLastRefreshed(new Date())
+        return response.data
+      } catch (error) {
+        throw error
+      }
     },
   })
 
-  // Fetch detailed order data - keeping your existing API call
   const { data: orderDetails } = useQuery({
     queryKey: ["orderHistoryDetails", selectedOrder?.id],
     queryFn: () => (selectedOrder ? orderApi.getOrderDetails(selectedOrder.id) : null),
     enabled: !!selectedOrder,
   })
 
-  // Fetch price history - keeping your existing API call
   const fetchPriceHistory = async (orderId) => {
     try {
       const { data } = await orderApi.getOrderPriceHistory(orderId)
-      // Transform the data if needed
       const transformedData = data.map((item) => ({
         ...item,
-        price: item.price || item.currentPrice, // fallback to currentPrice if price not available
-        startDate: item.startDate || item.createdAt, // fallback to createdAt if startDate not available
-        isActive: item.isActive || item.wasActive, // handle different field names
+        price: item.price || item.currentPrice,
+        startDate: item.startDate || item.createdAt,
+        isActive: item.isActive || item.wasActive,
       }))
       setPriceHistory(transformedData)
+      toast.success("Price history loaded")
     } catch (err) {
       console.error("Failed to fetch price history:", err)
-      setPriceHistory([]) // Set empty array on error
+      setPriceHistory([])
+      toast.error("Failed to load price history")
+    }
+  }
+
+  const handleRefresh = async () => {
+    try {
+      await refetch()
+      toast.success(`History refreshed at ${new Date().toLocaleTimeString()}`)
+    } catch (error) {
+      toast.error("Failed to refresh history")
     }
   }
 
@@ -121,7 +133,7 @@ export default function AdminOrderHistory() {
     const searchLower = searchTerm.toLowerCase().trim()
     const matchesSearch =
       !searchTerm ||
-     order.employee?.employeeId?.toLowerCase().includes(searchLower) ||
+      order.employee?.employeeId?.toLowerCase().includes(searchLower) ||
       order.employeeName.toLowerCase().includes(searchLower) ||
       order.menuItemName.toLowerCase().includes(searchLower) ||
       order.id.toString().includes(searchLower)
@@ -133,7 +145,6 @@ export default function AdminOrderHistory() {
     return matchesSearch && matchesStatus && matchesDepartment && matchesCategory
   })
 
-  // Sorting
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     let aValue = a[sortConfig.key]
     let bValue = b[sortConfig.key]
@@ -182,6 +193,7 @@ export default function AdminOrderHistory() {
     a.download = `order-history-${new Date().toISOString().split("T")[0]}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
+    toast.success("CSV exported successfully")
   }
 
   const formatDateTime = (dateString) => {
@@ -225,7 +237,6 @@ export default function AdminOrderHistory() {
     return acc
   }, {})
 
-  // Check if user is actively searching
   const isSearching = searchTerm.trim().length > 0
 
   if (isLoading)
@@ -253,7 +264,6 @@ export default function AdminOrderHistory() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -262,15 +272,20 @@ export default function AdminOrderHistory() {
               Order History
             </h1>
             <p className="text-gray-600 mt-1">View completed and cancelled orders</p>
+            {lastRefreshed && (
+              <p className="text-xs text-gray-500 mt-1">
+                Last refreshed: {lastRefreshed.toLocaleTimeString()}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => refetch()}
+              onClick={handleRefresh}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <RefreshCw size={16} />
-              Refresh
+              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              {isLoading ? "Refreshing..." : "Refresh"}
             </button>
             <button
               onClick={exportToCSV}
@@ -283,7 +298,6 @@ export default function AdminOrderHistory() {
           </div>
         </div>
 
-        {/* Stats Cards - Only show when not searching */}
         {!isSearching && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
             <div className="bg-white p-4 rounded-lg shadow-sm border">
@@ -329,7 +343,6 @@ export default function AdminOrderHistory() {
         )}
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border mb-6">
         <div className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -399,7 +412,6 @@ export default function AdminOrderHistory() {
         </div>
       </div>
 
-      {/* Orders Table */}
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -594,7 +606,6 @@ export default function AdminOrderHistory() {
         )}
       </div>
 
-      {/* Order Details Modal - keeping your existing modal structure */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -614,7 +625,6 @@ export default function AdminOrderHistory() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Order Information */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <ClipboardList className="mr-2" size={18} /> Order Information
@@ -647,20 +657,14 @@ export default function AdminOrderHistory() {
                 </div>
               </div>
 
-              {/* Employee Details */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <User className="mr-2" size={18} /> Employee Details
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
-                 <div>
+                  <div>
                     <p className="text-sm text-gray-500">Employee ID</p>
                     <p className="font-medium">{selectedOrder.employee?.employeeId || "N/A"}</p>
-
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Name</p>
-                    <p>{selectedOrder.employeeName}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Name</p>
@@ -673,7 +677,6 @@ export default function AdminOrderHistory() {
                 </div>
               </div>
 
-              {/* Item Details */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <Utensils className="mr-2" size={18} /> Item Details
@@ -698,7 +701,6 @@ export default function AdminOrderHistory() {
                 </div>
               </div>
 
-              {/* Price History */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-700 flex items-center">
                   <IndianRupee className="mr-2" size={18} /> Price History
