@@ -84,7 +84,7 @@ export default function ViewCart({
                 onClick={onClose}
                 className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
               >
-                Continue Shopping
+                Continue Ordering
               </button>
             </div>
           ) : (
@@ -105,19 +105,7 @@ export default function ViewCart({
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <span>Qty: {item.quantity}</span>
                           <span>₹{item.priceAtOrder || item.price || 0} each</span>
-                          {item.status && (
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                item.status === "CART"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : item.status === "PENDING"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {item.status}
-                            </span>
-                          )}
+                          
                         </div>
                       </div>
                       <div className="text-right">
@@ -156,7 +144,7 @@ export default function ViewCart({
                       onClick={onClose}
                       className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                     >
-                      Continue Shopping
+                      Continue Ordering
                     </button>
                     <button
                       onClick={onPlaceAllOrders}
@@ -182,7 +170,7 @@ export default function ViewCart({
                       onClick={onClose}
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
                     >
-                      Continue Shopping
+                      Continue Ordering 
                     </button>
                   </div>
                 )}
