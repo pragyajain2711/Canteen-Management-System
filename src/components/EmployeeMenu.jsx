@@ -73,6 +73,7 @@ export default function EmployeeMenu() {
       setError(null)
 
       const response = await employeeMenuApi.getWeeklyMenu(selectedDay, filters.category)
+      console.log("Weekly menu response:", response.data);
       const items = response.data.map((item) => item.menuItem)
       setMenuItems(items)
       setFilteredItems(items)
@@ -80,9 +81,9 @@ export default function EmployeeMenu() {
       setError(err.response?.data?.message || "Failed to load menu items")
       console.error("API Error:", err)
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const loadCartItems = async () => {
     try {
@@ -1039,30 +1040,6 @@ export default function EmployeeMenu() {
                           </div>
                         </div>
                       </div>
-
-                      {/* Order Status Summary */}
-                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                        <h4 className="font-medium text-gray-900 mb-3">Order Status</h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          {["PENDING", "PREPARING", "READY", "DELIVERED"].map((status) => {
-                            const count = cartItems.filter((item) => item.status === status).length
-                            const statusColors = {
-                              PENDING: "text-yellow-600 bg-yellow-100",
-                              PREPARING: "text-blue-600 bg-blue-100",
-                              READY: "text-green-600 bg-green-100",
-                              DELIVERED: "text-gray-600 bg-gray-100",
-                            }
-                            return (
-                              <div key={status} className="flex justify-between items-center">
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[status]}`}>
-                                  {status.toLowerCase()}
-                                </span>
-                                <span className="font-medium">{count}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -1132,7 +1109,7 @@ export default function EmployeeMenu() {
                         onClick={() => setShowCart(false)}
                         className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-200 transition-all"
                       >
-                        Continue Shopping
+                        Continue Ordering
                       </button>
                     </div>
                   </div>
