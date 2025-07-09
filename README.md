@@ -35,9 +35,13 @@ The page will reload when you make changes.\
 You may also see any lint errors in the console.
 
 Issue: Slow installation
+rd /s /q node_modules
+del package-lock.json
 npm cache clean --force
-rm -rf node_modules package-lock.json
+npm install
+or 
 npm install --no-optional
+
 
 📄 License
 MIT © 2024 Akanksha Singh
