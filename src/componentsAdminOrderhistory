@@ -121,7 +121,7 @@ export default function AdminOrderHistory() {
     const searchLower = searchTerm.toLowerCase().trim()
     const matchesSearch =
       !searchTerm ||
-      order.employeeId.toLowerCase().includes(searchLower) ||
+     order.employee?.employeeId?.toLowerCase().includes(searchLower) ||
       order.employeeName.toLowerCase().includes(searchLower) ||
       order.menuItemName.toLowerCase().includes(searchLower) ||
       order.id.toString().includes(searchLower)
