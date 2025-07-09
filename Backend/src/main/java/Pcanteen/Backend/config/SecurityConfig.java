@@ -45,23 +45,8 @@ public class SecurityConfig {
 		this.jwtAuthFilter = jwtAuthFilter;
 		this.userDetailsService = userDetailsService;
 	}
-/*
-	@Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-        
-            .csrf(AbstractHttpConfigurer::disable)
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }*/
-     @Bean
+  /*   @Bean
      public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
          http
              .cors(Customizer.withDefaults()) // 👈 Enables CORS with your CorsFilter bean
@@ -73,6 +58,44 @@ public class SecurityConfig {
                  .requestMatchers("/api/menu/**").permitAll()
                  //.requestMatchers("/api/menu/**").hasRole("ADMIN")
                 // .requestMatchers("/api/transactions/**").hasRole("ADMIN")
+                 .requestMatchers("/api/orders/**").permitAll()
+                 .requestMatchers("/api/transactions/**").permitAll()
+                 .requestMatchers("/api/feedback/notifications/my").authenticated()
+                 .requestMatchers("/api/feedback/suggestions").authenticated()
+                 .requestMatchers("/api/feedback/notifications/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                 .requestMatchers("/api/feedback/suggestions/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                 
+                 .anyRequest().authenticated()
+             )
+             .sessionManagement(sess -> 
+                 sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+             )
+             .authenticationProvider(authenticationProvider())
+             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+         return http.build();
+     }*/
+     
+     @Bean
+     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+         http
+             .cors(Customizer.withDefaults())
+             .csrf(AbstractHttpConfigurer::disable)
+             .authorizeHttpRequests(auth -> auth
+                 .requestMatchers("/api/auth/**").permitAll()
+                 // Admin-only endpoints
+                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                 .requestMatchers("/api/feedback/notifications/create").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                 .requestMatchers("/api/feedback/suggestions/all").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                 .requestMatchers("/api/feedback/suggestions/respond/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                 
+                 // Employee accessible endpoints
+                 .requestMatchers("/api/feedback/notifications/my").hasAnyRole("USER", "ADMIN", "SUPER_ADMIN")
+                 .requestMatchers("/api/feedback/suggestions/create").hasAnyRole("USER", "ADMIN", "SUPER_ADMIN")
+                 .requestMatchers("/api/feedback/suggestions/my").hasAnyRole("USER", "ADMIN", "SUPER_ADMIN")
+                 
+                 // Public endpoints
+                 .requestMatchers("/api/menu/**").permitAll()
                  .requestMatchers("/api/orders/**").permitAll()
                  .requestMatchers("/api/transactions/**").permitAll()
                  .anyRequest().authenticated()

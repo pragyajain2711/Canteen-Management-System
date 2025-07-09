@@ -324,7 +324,6 @@ public class AdminController {
         return ResponseEntity.ok("Admin demoted to regular employee");
     }
     
-    // Add this DTO class inside the controller file
     static class PromoteRequest {
         private String employeeId;
         
@@ -337,7 +336,6 @@ public class AdminController {
             this.employeeId = employeeId;
         }
     }
- // Existing methods...
 
     // New endpoints for Customer Management
     @GetMapping("/customers")

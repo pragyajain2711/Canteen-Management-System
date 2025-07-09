@@ -20,5 +20,5 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Employee> findByCreatedAtBefore(LocalDateTime date);
     //List<Employee> findBySuperAdminFalse();
 	Optional<MenuItem> findByEmployeeId(Employee employee);
-	
+	List<Employee> findByIsAdminFalseAndIsSuperAdminFalse();
 }
