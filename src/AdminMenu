@@ -970,14 +970,7 @@ export default function MenuManagement() {
                             </button>
                           </Tooltip>
 
-                          <Tooltip content="Delete Item">
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </Tooltip>
+                          
                         </div>
                       </td>
                     </tr>
@@ -1519,3 +1512,5 @@ export default function MenuManagement() {
     </div>
   )
 }
+
+
