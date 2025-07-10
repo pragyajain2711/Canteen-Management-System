@@ -1,4 +1,4 @@
-import { useState ,useEffect} from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Plus,
@@ -16,7 +16,6 @@ import {
 import { format, startOfWeek, endOfWeek, addDays } from "date-fns"
 import { weeklyMenuApi, menuApi } from "../api"
 
-// Constants
 const daysOfWeek = [
   { value: "MONDAY", label: "Monday", short: "Mon" },
   { value: "TUESDAY", label: "Tuesday", short: "Tue" },
@@ -65,14 +64,14 @@ const mealCategories = [
   },
 ]
 
-export default  function WeeklyMenuManagement() {
+export default function WeeklyMenuManagement() {
   const queryClient = useQueryClient()
   const [selectedWeek, setSelectedWeek] = useState(new Date())
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [selectedDay, setSelectedDay] = useState("")
   const [selectedMealCategory, setSelectedMealCategory] = useState("")
-  const [selectedMenuItem, setSelectedMenuItem] = useState("")
+  const [selectedMenuItem, setSelectedMenuItem] = useState(null)
   const [viewMode, setViewMode] = useState("double")
   const [currentDayIndex, setCurrentDayIndex] = useState(0)
   const [selectedMealFilter, setSelectedMealFilter] = useState("all")
@@ -81,7 +80,6 @@ export default  function WeeklyMenuManagement() {
   const weekStart = startOfWeek(selectedWeek, { weekStartsOn: 1 })
   const weekEnd = endOfWeek(selectedWeek, { weekStartsOn: 1 })
 
-  // Fetch weekly menus
   const { data: weeklyMenus = [], isLoading } = useQuery({
     queryKey: ["weeklyMenus", weekStart.toISOString(), weekEnd.toISOString()],
     queryFn: () => 
@@ -89,72 +87,56 @@ export default  function WeeklyMenuManagement() {
         .then(res => res.data),
   })
 
-  const filteredMenuItems =
-    selectedMealFilter === "all" ? weeklyMenus : weeklyMenus.filter((item) => item.mealCategory === selectedMealFilter)
-
-
-
- useEffect(() => {
-  let cancelled = false;
-
-  const checkAndCopyWeek = async () => {
-    try {
-      const currentWeekItems = await weeklyMenuApi.getByDateRange(
-        weekStart.toISOString(),
-        weekEnd.toISOString()
-      );
-
-      if (!cancelled && currentWeekItems.data.length === 0) {
-        // Double-check if this week is already copied (to prevent loops)
-        const previousWeekStart = new Date(weekStart);
-        previousWeekStart.setDate(previousWeekStart.getDate() - 7);
-
-        const previousItems = await weeklyMenuApi.getByDateRange(
-          previousWeekStart.toISOString(),
-          new Date(previousWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString()
-        );
-
-        if (previousItems.data.length > 0) {
-          await weeklyMenuApi.copyFromPreviousWeek(weekStart.toISOString().split("T")[0]);
-          await queryClient.invalidateQueries({
-            queryKey: ["weeklyMenus", weekStart.toISOString(), weekEnd.toISOString()],
-          });
-
-          setWeekCopied(true);
-          setTimeout(() => setWeekCopied(false), 3000);
-        }
-      }
-    } catch (error) {
-      if (!cancelled) console.error("Error checking/copying week:", error);
-    }
-  };
-
-  checkAndCopyWeek();
-
-  return () => {
-    cancelled = true; // Cancel pending effect if component re-renders
-  };
-}, [weekStart.toISOString(), weekEnd.toISOString()]);
-
-  
-
-  // Fetch available menu items
- /* const { data: availableMenuItems = [] } = useQuery({
+  const { data: availableMenuItems = [] } = useQuery({
     queryKey: ["availableMenuItems", selectedMealCategory],
     queryFn: () => 
       menuApi.getActiveItems(new Date().toISOString())
-        .then(res => res.data),
-  })*/
- const { data: availableMenuItems = [] } = useQuery({
-  queryKey: ["availableMenuItems", selectedMealCategory],
-  queryFn: () => 
-    menuApi.getActiveItems(new Date().toISOString())
-      .then(res => res.data.filter(item => 
-        !selectedMealCategory || item.category === selectedMealCategory
-      )),
-});
+        .then(res => res.data.filter(item => 
+          !selectedMealCategory || item.category === selectedMealCategory
+        )),
+  })
 
-  // Mutations
+  useEffect(() => {
+    let cancelled = false
+
+    const checkAndCopyWeek = async () => {
+      try {
+        const currentWeekItems = await weeklyMenuApi.getByDateRange(
+          weekStart.toISOString(),
+          weekEnd.toISOString()
+        )
+
+        if (!cancelled && currentWeekItems.data.length === 0) {
+          const previousWeekStart = new Date(weekStart)
+          previousWeekStart.setDate(previousWeekStart.getDate() - 7)
+
+          const previousItems = await weeklyMenuApi.getByDateRange(
+            previousWeekStart.toISOString(),
+            new Date(previousWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString()
+          )
+
+          if (previousItems.data.length > 0) {
+            await weeklyMenuApi.copyFromPreviousWeek(weekStart.toISOString().split("T")[0])
+            await queryClient.invalidateQueries({
+              queryKey: ["weeklyMenus", weekStart.toISOString(), weekEnd.toISOString()],
+            })
+
+            setWeekCopied(true)
+            setTimeout(() => setWeekCopied(false), 3000)
+          }
+        }
+      } catch (error) {
+        if (!cancelled) console.error("Error checking/copying week:", error)
+      }
+    }
+
+    checkAndCopyWeek()
+
+    return () => {
+      cancelled = true
+    }
+  }, [weekStart.toISOString(), weekEnd.toISOString()])
+
   const addMutation = useMutation({
     mutationFn: (data) => weeklyMenuApi.create(data),
     onSuccess: () => {
@@ -171,18 +153,15 @@ export default  function WeeklyMenuManagement() {
     },
   })
 
-  console.log("Selected Menu Item:", selectedMenuItem);
-
   const handleAddWeeklyMenuItem = async () => {
     await addMutation.mutateAsync({
       weekStartDate: weekStart.toISOString(),
       weekEndDate: weekEnd.toISOString(),
       dayOfWeek: selectedDay,
       mealCategory: selectedMealCategory,
-      //menuItemId: selectedMenuItem,
-      menuItem: {  // Send as object with menuId
-      menuId: selectedMenuItem.menuId  // Assuming selectedMenuItem is the full object
-    }
+      menuItem: {
+        menuId: selectedMenuItem.menuId
+      }
     })
   }
 
@@ -190,24 +169,10 @@ export default  function WeeklyMenuManagement() {
     await deleteMutation.mutateAsync(id)
   }
 
- /*const handleClearWeek = async () => {
-    if (window.confirm("Are you sure you want to clear all menu items for this week?")) {
-      try {
-        await weeklyMenuApi.clearWeek(
-          weekStart.toISOString(),
-          weekEnd.toISOString()
-        )
-        queryClient.invalidateQueries({ queryKey: ["weeklyMenus"] })
-      } catch (error) {
-        console.error("Error clearing week:", error)
-      }
-    }
-  }*/
-
   const resetAddForm = () => {
     setSelectedDay("")
     setSelectedMealCategory("")
-    setSelectedMenuItem("")
+    setSelectedMenuItem(null)
   }
 
   const getMenuItemsForDayAndCategory = (day, category) => {
@@ -247,21 +212,7 @@ export default  function WeeklyMenuManagement() {
     }
   }
 
- /* const filteredMenuItems =
-    selectedMealFilter === "all" ? weeklyMenus : weeklyMenus.filter((item) => item.mealCategory === selectedMealFilter)
-
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading weekly menu...</p>
-        </div>
-      </div>
-    )
-  }*/
-
-    if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -315,16 +266,6 @@ export default  function WeeklyMenuManagement() {
               )}
             </div>
 
-
- {/* Clear Week Button */}
-       {/*}     <button
-              onClick={handleClearWeek}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear Week
-            </button>*/}
-
             {/* Add Menu Item Button */}
             <button
               onClick={() => setIsAddDialogOpen(true)}
@@ -349,7 +290,7 @@ export default  function WeeklyMenuManagement() {
             </button>
             {mealCategories.map((category) => {
               const CategoryIcon = category.icon
-              const itemCount = filteredMenuItems.filter((item) => item.mealCategory === category.value).length
+              const itemCount = weeklyMenus.filter((item) => item.mealCategory === category.value).length
 
               return (
                 <button
@@ -492,32 +433,29 @@ export default  function WeeklyMenuManagement() {
                         className={`flex items-center gap-3 p-3 rounded-lg border-2 border-dashed ${category.color}`}
                       >
                         <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-white shadow-sm">
-                          <CategoryIcon className={`w-5 h-5 ${category.iconColor}`} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-semibold">{category.label}</div>
-                          <div className="text-sm opacity-75">
-                            {menuItems.length} item{menuItems.length !== 1 ? "s" : ""}
+                          <div className="p-2 rounded-lg bg-white shadow-sm">
+                            <CategoryIcon className={`w-5 h-5 ${category.iconColor}`} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold">{category.label}</div>
+                            <div className="text-sm opacity-75">
+                              {menuItems.length} item{menuItems.length !== 1 ? "s" : ""}
+                            </div>
                           </div>
                         </div>
+
+                        <button
+                          onClick={() => {
+                            setSelectedDay(day.value)
+                            setSelectedMealCategory(category.value)
+                            setIsAddDialogOpen(true)
+                          }}
+                                                    className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-full"
+                          title={`Add ${category.label} item`}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
                       </div>
-
-{/* Add button moved here */}
-        <button
-          onClick={() => {
-            setSelectedDay(day.value);
-            setSelectedMealCategory(category.value);
-            setIsAddDialogOpen(true);
-          }}
-          className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-full"
-          title={`Add ${category.label} item`}
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-
-
 
                       <div className="space-y-2 min-h-[100px] bg-gray-50 rounded-lg p-4">
                         {menuItems.length === 0 ? (
@@ -544,6 +482,16 @@ export default  function WeeklyMenuManagement() {
                                     </span>
                                     <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">
                                       {item.menuItem.category}
+                                    </span>
+                                    {/* Availability Status Badge */}
+                                    <span
+                                      className={`text-xs px-2 py-1 rounded ${
+                                        item.menuItem.availableStatus
+                                          ? "bg-green-100 text-green-800 border border-green-200"
+                                          : "bg-red-100 text-red-800 border border-red-200"
+                                      }`}
+                                    >
+                                      {item.menuItem.availableStatus ? "Available" : "Sold Out"}
                                     </span>
                                   </div>
                                 </div>
@@ -646,73 +594,28 @@ export default  function WeeklyMenuManagement() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Menu Item</label>
-             {/*  <select
-                  value={selectedMenuItem}
-                  onChange={(e) => setSelectedMenuItem(e.target.value)}
+                <select
+                  value={selectedMenuItem?.menuId || ""}
+                  onChange={(e) => {
+                    const id = e.target.value
+                    const item = availableMenuItems.find((i) => i.menuId === id)
+                    setSelectedMenuItem(item)
+                  }}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select menu item</option>
-                  {availableMenuItems
-                    .filter((item) => !selectedMealCategory || item.category === selectedMealCategory)
-                    .map((item) => (
-                      <option key={item.id.toString()} value={item.id.toString()}>
-                        {item.name} - ₹{item.price}
-                      </option>
-                    ))}
+                  {availableMenuItems.map((item) => (
+                    <option key={item.menuId} value={item.menuId}>
+                      {item.name} - ₹{item.price} ({item.availableStatus ? "Available" : "Sold Out"})
+                    </option>
+                  ))}
                 </select>
 
-                <select
-  value={selectedMenuItem}
-  onChange={(e) => setSelectedMenuItem(e.target.value)}
-  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
->
-  <option value="">Select menu item</option>
-  {availableMenuItems.map((item) => (
-    <option key={item.id} value={item.id}>
-      {item.name} - ₹{item.price}
-    </option>
-  ))}
-</select>*/}
-{/*onChange={(e) => setSelectedMenuItem(e.target.value)}
-<select
-    value={selectedMenuItem}
-    onChange={(e) => setSelectedMenuItem(e.target.value)}
-    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-    disabled={ !selectedMealCategory}
-  >
-    <option value="">Select menu item</option>
-    {availableMenuItems.map((item) => (
-      <option key={item.id} value={item.id}>
-        {item.name} - ₹{item.price}
-      </option>
-    ))}
-  </select>*/}
-
-  <select
-  value={selectedMenuItem?.menuId || ""}
-  onChange={(e) => {
-    const id = e.target.value;
-    const item = availableMenuItems.find(i => i.menuId === id);
-    setSelectedMenuItem(item);
-  }}
->
-  <option value="">Select menu item</option>
-  {availableMenuItems.map(item => (
-    <option key={item.menuId} value={item.menuId}>
-      {item.name} - ₹{item.price}
-    </option>
-  ))}
-</select>
-
-   {/* Optional debug/info message */}
-  { availableMenuItems.length === 0 && selectedMealCategory && (
-    <p className="text-sm text-red-500 mt-2">
-      No items available for "{selectedMealCategory}"
-    </p>
-  )}
-
-
-
+                {availableMenuItems.length === 0 && selectedMealCategory && (
+                  <p className="text-sm text-red-500 mt-2">
+                    No items available for "{selectedMealCategory}"
+                  </p>
+                )}
               </div>
             </div>
 

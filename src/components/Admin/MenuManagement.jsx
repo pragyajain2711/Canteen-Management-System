@@ -420,7 +420,7 @@ export default function MenuManagement() {
     return `${category.color} ${category.iconColor}`
   }
 
-  const handleUpdateItem = async () => {
+  /*const handleUpdateItem = async () => {
     if (!selectedItem) return
 
     const priceChanged = Number(formData.price) !== originalPrice
@@ -443,7 +443,61 @@ export default function MenuManagement() {
     queryClient.invalidateQueries(["menuItems"])
     setIsEditDialogOpen(false)
     resetForm()
+  }*/
+ const handleUpdateItem = async () => {
+  if (!selectedItem) return
+
+  const priceChanged = Number(formData.price) !== originalPrice
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  if (priceChanged) {
+    // Update the existing item to be inactive with end date = yesterday
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    
+    await menuApi.updateItem(selectedItem.id, {
+      ...selectedItem,
+      endDate: yesterday.toISOString(),
+      availableStatus: false,
+      isActive: false
+    })
+
+    // Create new item with new price and active status
+    await menuApi.createItem({
+      name: formData.name,
+      description: formData.description,
+      category: selectedItem.category,
+      categories: [selectedItem.category],
+      unit: formData.unit,
+      quantity: formData.quantity,
+      price: Number(formData.price) || 0,
+      startDate: today.toISOString(),
+      endDate: formData.endDate.toISOString(),
+      availableStatus: formData.availableStatus,
+      isActive: true
+    })
+  } else {
+    // Regular update without price change
+    const updateData = {
+      name: formData.name,
+      description: formData.description,
+      category: selectedItem.category,
+      categories: [selectedItem.category],
+      unit: formData.unit,
+      quantity: formData.quantity,
+      price: Number(formData.price) || 0,
+      startDate: formData.startDate.toISOString(),
+      endDate: formData.endDate.toISOString(),
+      availableStatus: formData.availableStatus,
+    }
+    await menuApi.updateItem(selectedItem.id, updateData)
   }
+
+  queryClient.invalidateQueries(["menuItems"])
+  setIsEditDialogOpen(false)
+  resetForm()
+}
 
   const resetForm = () => {
     setFormData({
@@ -1024,7 +1078,6 @@ export default function MenuManagement() {
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
                     <span className="text-sm font-medium text-green-800">
-                      New items are set to "Available" by default
                     </span>
                   </div>
                   <div className="flex items-center">
