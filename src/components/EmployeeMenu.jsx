@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect } from "react"
 import { employeeMenuApi } from "./api"
 import api from "./api"
@@ -22,13 +24,28 @@ import {
   AlertCircle,
 } from "lucide-react"
 
+// Helper function to check if item is active based on date range
+const isItemActive = (startDate, endDate) => {
+  const now = new Date()
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  return today >= startDay && today <= endDay
+}
+
 export default function EmployeeMenu() {
   // State for menu data and filtering
   const [menuItems, setMenuItems] = useState([])
   const [filteredItems, setFilteredItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedDay, setSelectedDay] = useState("WEDNESDAY") // Current day
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+    return days[new Date().getDay()]
+  })
+
   const [searchQuery, setSearchQuery] = useState("")
   const [filters, setFilters] = useState({
     category: "all",
@@ -73,17 +90,20 @@ export default function EmployeeMenu() {
       setError(null)
 
       const response = await employeeMenuApi.getWeeklyMenu(selectedDay, filters.category)
-      console.log("Weekly menu response:", response.data);
-      const items = response.data.map((item) => item.menuItem)
+      console.log("Weekly menu response:", response.data)
+      const items = response.data.map((item) => ({
+        ...item.menuItem,
+        isActive: item.menuItem.availableStatus && isItemActive(item.menuItem.startDate, item.menuItem.endDate),
+      }))
       setMenuItems(items)
       setFilteredItems(items)
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load menu items")
       console.error("API Error:", err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const loadCartItems = async () => {
     try {
@@ -157,9 +177,10 @@ export default function EmployeeMenu() {
       )
     }
 
-    if (filters.status !== "all") {
-      filtered = filtered.filter((item) => (filters.status === "active" ? item.isActive : !item.isActive))
-    }
+    filtered = filtered.filter((item) => {
+      const itemIsActive = item.availableStatus && isItemActive(item.startDate, item.endDate)
+      return filters.status === "active" ? itemIsActive : filters.status === "inactive" ? !itemIsActive : true
+    })
 
     setFilteredItems(filtered)
   }, [menuItems, searchQuery, filters.status])
@@ -176,7 +197,7 @@ export default function EmployeeMenu() {
 
   // Handle opening order dialog
   const handleOpenOrderDialog = (item) => {
-    if (!item.isActive) return
+    if (!(item.availableStatus && isItemActive(item.startDate, item.endDate))) return
     setSelectedItem(item)
     setOrderQuantity(1)
     setOrderRemarks("")
@@ -208,7 +229,7 @@ export default function EmployeeMenu() {
         priceAtOrder: selectedItem.price,
         quantity: orderQuantity,
         totalPrice: selectedItem.price * orderQuantity,
-        remarks:` ${orderRemarks} ${isAdmin ? `Ordered by admin for ${orderContext === "employee" ? "employee " + selectedEmployeeId : "self"}` : ""}`,
+        remarks: ` ${orderRemarks} ${isAdmin ? `Ordered by admin for ${orderContext === "employee" ? "employee " + selectedEmployeeId : "self"}` : ""}`,
         employeeId,
         status: "CART", // Special status for cart items
         expectedDeliveryDate: new Date().toISOString().split("T")[0],
@@ -496,24 +517,24 @@ export default function EmployeeMenu() {
                 const canOrder = isCurrent
 
                 return (
-                 <button
-  key={day.key}
-  onClick={() => setSelectedDay(day.key)}
-  className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-    isSelected && canOrder
-      ? "bg-blue-500 text-white shadow-lg transform scale-105"
-      : canOrder
-        ? "text-blue-600 hover:bg-blue-50 border border-blue-200"
-        : "text-gray-500 bg-gray-200 cursor-not-allowed"
-  }`}
-  title={canOrder ? `Order for ${day.fullName}` : `Cannot order for ${day.fullName}`}
->
-  <div className="flex flex-col items-center">
-    <span>{day.label}</span>
-    <span className="text-xs mt-1">{day.fullName}</span>
-    {isCurrent && <div className="w-2 h-2 bg-blue-400 rounded-full mt-1"></div>}
-  </div>
-</button>
+                  <button
+                    key={day.key}
+                    onClick={() => setSelectedDay(day.key)}
+                    className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isSelected && canOrder
+                        ? "bg-blue-500 text-white shadow-lg transform scale-105"
+                        : canOrder
+                          ? "text-blue-600 hover:bg-blue-50 border border-blue-200"
+                          : "text-gray-500 bg-gray-200 cursor-not-allowed"
+                    }`}
+                    title={canOrder ? `Order for ${day.fullName}` : `Cannot order for ${day.fullName}`}
+                  >
+                    <div className="flex flex-col items-center">
+                      <span>{day.label}</span>
+                      <span className="text-xs mt-1">{day.fullName}</span>
+                      {isCurrent && <div className="w-2 h-2 bg-blue-400 rounded-full mt-1"></div>}
+                    </div>
+                  </button>
                 )
               })}
             </div>
@@ -661,25 +682,33 @@ export default function EmployeeMenu() {
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <span
                                     className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                      item.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                                      item.availableStatus && isItemActive(item.startDate, item.endDate)
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
                                     }`}
                                   >
-                                    {item.isActive ? "Available" : "Unavailable"}
+                                    {item.availableStatus && isItemActive(item.startDate, item.endDate)
+                                      ? "Available"
+                                      : "Unavailable"}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                   <button
                                     onClick={() => handleOpenOrderDialog(item)}
-                                    disabled={!item.isActive || !isCurrentDay(selectedDay)}
+                                    disabled={
+                                      !(item.availableStatus && isItemActive(item.startDate, item.endDate)) ||
+                                      !isCurrentDay(selectedDay)
+                                    }
                                     className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                                      item.isActive && isCurrentDay(selectedDay)
+                                      (item.availableStatus && isItemActive(item.startDate, item.endDate)) &&
+                                      isCurrentDay(selectedDay)
                                         ? "bg-blue-500 text-white hover:bg-blue-600"
                                         : "bg-gray-200 text-gray-500 cursor-not-allowed"
                                     }`}
                                   >
                                     {!isCurrentDay(selectedDay)
                                       ? "View Only"
-                                      : item.isActive
+                                      : item.availableStatus && isItemActive(item.startDate, item.endDate)
                                         ? "Add to Cart"
                                         : "Unavailable"}
                                   </button>
@@ -847,17 +876,17 @@ export default function EmployeeMenu() {
                     <div className="space-y-6">
                       {/* Admin Context Info */}
                       {isAdmin && (
-  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-    <div className="flex items-center">
-      <CheckCircle className="w-4 h-4 text-blue-500 mr-2" />
-      <span className="text-sm text-blue-800 font-medium">
-        {orderContext === "employee" && selectedEmployeeId
-          ? `Cart for employee: ${selectedEmployeeId}`
-          : "Your cart"}
-      </span>
-    </div>
-  </div>
-)}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center">
+                            <CheckCircle className="w-4 h-4 text-blue-500 mr-2" />
+                            <span className="text-sm text-blue-800 font-medium">
+                              {orderContext === "employee" && selectedEmployeeId
+                                ? `Cart for employee: ${selectedEmployeeId}`
+                                : "Your cart"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Cart Items Table - Enhanced */}
                       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -1098,7 +1127,8 @@ export default function EmployeeMenu() {
                           // Handle checkout logic here
                           alert(
                             `Proceeding to checkout with ${cartItems.length} orders totaling ₹${getCartTotal().toFixed(2)},
-                          `)
+                          `,
+                          )
                         }}
                       >
                         <ShoppingCart className="w-4 h-4 mr-2" />
