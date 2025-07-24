@@ -44,6 +44,6 @@ npm install --no-optional
 
 
 📄 License
-MIT © 2024 Akanksha Singh
+MIT © 2024 Pragya Jain
 
 
