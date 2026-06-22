@@ -17,7 +17,7 @@ A modern food ordering and management system for office canteens.
 | Styling        | Tailwind CSS       | ^3.4.17   |
 
 ### Home Page
-![Home Page](assets/home.png)
+![Home Page](public/assets/images/Home.png.png)
 
 ### Menu
 ![Menu](assets/Menu.png)
