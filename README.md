@@ -20,10 +20,10 @@ A modern food ordering and management system for office canteens.
 ![Home Page](public/assets/images/Home.png.png)
 
 ### Menu
-![Menu](assets/Menu.png)
+![Menu](public/assets/images/Menu.png.png)
 
 ### Signup
-![Signup](assets/Signup.png)
+![Signup]()
 
 ##  Quick Start
 
