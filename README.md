@@ -23,7 +23,7 @@ A modern food ordering and management system for office canteens.
 ![Menu](public/assets/images/Menu.png.png)
 
 ### Signup
-![Signup]()
+![Signup](public/assets/images/Signup.png.png)
 
 ##  Quick Start
 
