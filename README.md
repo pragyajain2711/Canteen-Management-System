@@ -16,6 +16,15 @@ A modern food ordering and management system for office canteens.
 | Routing        | react-router-dom   | ^7.6.2    |
 | Styling        | Tailwind CSS       | ^3.4.17   |
 
+### Home Page
+![Home Page](assets/home.png)
+
+### Menu
+![Menu](assets/Menu.png)
+
+### Signup
+![Signup](assets/Signup.png)
+
 ##  Quick Start
 
 # 1. Clone repository
